@@ -1,0 +1,371 @@
+---
+title: "/create-colleague"
+description: "Full reference for the /create-colleague command — intake questions, data sources, and generated file structure."
+---
+
+The `/create-colleague` command starts an interactive intake session that distills a colleague into an AI Skill. You answer three questions, provide source materials, and the skill generates a complete `SKILL.md`, `work.md`, `persona.md`, and `meta.json` under `colleagues/{slug}/`.
+
+## Trigger conditions
+
+The command activates when you say any of the following:
+
+| Input | Description |
+|-------|-------------|
+| `/create-colleague` | Explicit slash command |
+| "Help me create a colleague skill" | Natural language |
+| "I want to distill a colleague" | Natural language |
+| "New colleague" | Natural language shorthand |
+| "Make a skill for XX" | Natural language with name |
+
+---
+
+## Step 1: Intake questions
+
+The skill asks exactly three questions. All fields except the alias can be skipped.
+
+### Q1 — Alias / codename
+
+<ParamField path="alias" type="string" required>
+  The name or codename used to identify this colleague. This becomes the directory slug and the trigger word for invoking the skill later.
+
+  **Format rules:**
+  - Any string is accepted
+  - Chinese names are converted to pinyin using `pypinyin`, joined with `-` (e.g. `青云` → `qing-yun`, `小李` → `xiao-li`)
+  - English names are lowercased and hyphenated (e.g. `Big Mike` → `big-mike`)
+  - Multiple words should use `-` as the separator, not underscores
+  - If `pypinyin` is not installed, Chinese characters are dropped; install it to enable proper pinyin conversion
+</ParamField>
+
+**Example input:**
+
+```
+qing-yun
+```
+
+---
+
+### Q2 — Basic info
+
+<ParamField path="basic_info" type="string">
+  A single sentence covering company, level, role, and gender. Say whatever comes to mind. All sub-fields are optional.
+
+  **Parsed fields:**
+  - `company` — employer name (e.g. ByteDance, Alibaba, Tencent)
+  - `level` — job grade in the company's leveling system
+  - `role` — job function (e.g. backend engineer, product manager, designer)
+  - `gender` — any gender description, or omit entirely
+</ParamField>
+
+**Example input:**
+
+```
+ByteDance 2-1 backend engineer male
+```
+
+#### Company level reference table
+
+| Company | Format | Engineer | Senior Eng | Staff / Expert | Principal |
+|---------|--------|----------|------------|----------------|-----------|
+| ByteDance | X-Y | 2-1, 2-2 | 3-1, 3-2 | 3-3 | 3-3+ (O-level) |
+| Alibaba | P-level | P5, P6 | P7 | P8 | P9+ |
+| Tencent | T-level | T1-1 ~ T2-2 | T3-1, T3-2 | T4 | T4+ |
+| Baidu | T-level | T5, T6 | T7 | T8 | T9+ |
+| Meituan | P-level | P4, P5 | P6 | P7 | P8+ |
+| Huawei | Numeric | 13–15 | 16–17 | 18–19 | 20–21 |
+| NetEase | P-level | P1–P3 | P4 | P5 | P6+ |
+| JD.com | T-level | T3–T4 | T5 | T6 | T7+ |
+| Xiaomi | Numeric | 1–3 | 4–5 | 6–7 | 8+ |
+
+**Cross-company rough equivalences:**
+
+```
+ByteDance 2-1/2-2  ≈  Alibaba P6  ≈  Tencent T2    ≈  Baidu T6
+ByteDance 3-1      ≈  Alibaba P7  ≈  Tencent T3-1   ≈  Baidu T7
+ByteDance 3-2      ≈  Alibaba P7+ ≈  Tencent T3-2
+ByteDance 3-3      ≈  Alibaba P8  ≈  Tencent T4
+```
+
+<Note>
+  ByteDance 2-1 is the "Engineer" title. 3-1 and above is "Senior Engineer". 2-1 is roughly equivalent to Alibaba P6 — an independent contributor who can own and deliver tasks end-to-end.
+</Note>
+
+---
+
+### Q3 — Personality profile
+
+<ParamField path="personality" type="string">
+  A single free-form sentence covering MBTI, zodiac sign, personality tags, corporate culture tags, and any subjective impression. All sub-fields are optional.
+
+  **Parsed fields:**
+  - `mbti` — one of the 16 standard MBTI types (e.g. INTJ, ENFP)
+  - `zodiac` — one of the 12 zodiac signs
+  - `personality_tags` — matched against the tag library below, or accepted as custom text
+  - `culture_tags` — matched against the corporate culture library below
+  - `impression` — any free-form text that doesn't fit the above categories, preserved verbatim
+</ParamField>
+
+**Example input:**
+
+```
+INTJ Capricorn blame-shifter ByteDance-style strict in CR but never explains why
+```
+
+#### Personality tag library
+
+| Category | Tags |
+|----------|------|
+| Work attitude | Responsible · Good-enough · Blame-shifter · Takes-the-blame · Perfectionist · Procrastinator |
+| Communication | Direct · Roundabout · Quiet · Talkative · Voice-message addict · Read-no-reply · Random replies · Instant-reply compulsion |
+| Decision-making | Decisive · Flip-flopper · Defers-to-management · Forceful · Data-driven · Gut-feel |
+| Emotional style | Emotionally stable · Sensitive · Easily agitated · Cold and distant · Superficially agreeable · Passive-aggressive |
+| Tactics | PUA master · Office politician · Blame-shifting artist · Managing-up expert · Lecture giver · Emotional manipulator |
+
+#### Corporate culture tag library
+
+| Tag | Characteristics |
+|-----|----------------|
+| ByteDance-style | Candid, direct, obsessed with impact, always contextualizes, says "align" constantly |
+| Alibaba-style | Six Vein Spirit Sword, loves "empower", "leverage", "ecosystem", "closed loop" |
+| Tencent-style | Data-driven, horse-racing culture, conservative, focused on UX |
+| Huawei-style | Dedication culture, process-heavy, loves PPT reviews, emphasis on execution |
+| Baidu-style | Technology-first, strong hierarchy, intense internal competition |
+| Meituan-style | Extreme execution, detail-obsessed, localization mindset |
+| First-principles | Musk-style, questions fundamentals, rejects analogies, radical simplification |
+| OKR-obsessed | Frames everything as Objectives, micro-scrutinizes Key Results |
+| Big-corp-pipeline | Well-documented but low creativity, SOP-dependent, risk-averse |
+| Startup-mode | Resource-constrained, full-stack thinking, result-oriented, tolerates chaos |
+
+---
+
+## Step 2: Data source selection
+
+After the intake questions, the skill presents five data source options. You can mix and match, or skip entirely.
+
+```
+How would you like to provide source materials?
+
+  [A] Feishu Auto-Collect (recommended)
+      Enter name, auto-pull messages + docs + spreadsheets
+
+  [B] DingTalk Auto-Collect
+      Enter name, auto-pull docs + spreadsheets
+      Messages collected via browser (DingTalk API doesn't support message history)
+
+  [C] Feishu Link
+      Provide doc/Wiki link (browser session or MCP)
+
+  [D] Upload Files
+      PDF / images / exported JSON / email .eml
+
+  [E] Paste Text
+      Copy-paste text directly
+
+Can mix and match, or skip entirely (generate from manual info only).
+```
+
+<Tip>
+  Source material quality directly determines skill quality. Prioritize: long-form writing **by them** > **decision-making replies** > casual messages.
+</Tip>
+
+### Option A — Feishu Auto-Collect
+
+Requires first-time setup:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/feishu_auto_collector.py --setup
+```
+
+Collects group chat messages, private chat messages (requires user OAuth), Feishu docs and Wikis, and spreadsheets. Output files:
+
+```
+knowledge/{slug}/messages.txt
+knowledge/{slug}/docs.txt
+knowledge/{slug}/collection_summary.json
+```
+
+### Option B — DingTalk Auto-Collect
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/dingtalk_auto_collector.py --setup
+python3 ${CLAUDE_SKILL_DIR}/tools/dingtalk_auto_collector.py \
+  --name "{name}" \
+  --output-dir ./knowledge/{slug} \
+  --msg-limit 500 \
+  --doc-limit 20 \
+  --show-browser
+```
+
+<Note>
+  DingTalk's API does not support message history. The collector automatically falls back to browser scraping for messages. Add `--show-browser` on first use to complete the DingTalk login.
+</Note>
+
+### Option C — Feishu link
+
+Provide a Feishu doc or Wiki URL. The skill offers two sub-methods:
+
+- **Browser method** — reuses your local Chrome session; works with internal docs; requires `playwright`
+- **MCP method** — uses Feishu App Token via the official API; stable but requires App ID / App Secret setup
+
+### Option D — Upload files
+
+Supported formats: PDF, images, Feishu JSON export, email `.eml` / `.mbox`, Markdown, plain text. The `Read` tool handles PDF and images natively.
+
+### Option E — Paste text
+
+Paste content directly into the chat. No tool calls required.
+
+---
+
+## Step 3: Confirmation and preview
+
+Before writing files, the skill shows a summary and asks for confirmation:
+
+```
+Work Skill Summary:
+  - Responsible for: {xxx}
+  - Tech stack: {xxx}
+  - CR focus: {xxx}
+
+Persona Summary:
+  - Core personality: {xxx}
+  - Communication style: {xxx}
+  - Decision pattern: {xxx}
+
+Confirm generation? Or need adjustments?
+```
+
+---
+
+## Generated file locations
+
+After confirmation, files are written to `colleagues/{slug}/`:
+
+```
+colleagues/{slug}/
+├── SKILL.md            # Full skill (Persona + Work combined)
+├── work.md             # Work capabilities source file
+├── persona.md          # Persona source file (5-layer structure)
+├── meta.json           # Metadata
+├── versions/           # Auto-archived previous versions
+└── knowledge/          # Raw source material archive
+    ├── docs/
+    ├── messages/
+    └── emails/
+```
+
+### meta.json structure
+
+```json
+{
+  "name": "Qing Yun",
+  "slug": "qing-yun",
+  "created_at": "2026-04-02T00:00:00+00:00",
+  "updated_at": "2026-04-02T00:00:00+00:00",
+  "version": "v1",
+  "profile": {
+    "company": "ByteDance",
+    "level": "2-1",
+    "role": "backend engineer",
+    "gender": "male",
+    "mbti": "INTJ"
+  },
+  "tags": {
+    "personality": ["blame-shifter"],
+    "culture": ["ByteDance-style"]
+  },
+  "impression": "strict in CR but never explains why",
+  "knowledge_sources": [],
+  "corrections_count": 0
+}
+```
+
+### SKILL.md structure
+
+The generated `SKILL.md` follows the AgentSkills standard format:
+
+```markdown
+---
+name: colleague-{slug}
+description: {name}, {company} {level} {role}
+user-invocable: true
+---
+
+# {name}
+
+{company} {level} {role}
+
+---
+
+## PART A: Work Capabilities
+
+{work.md content}
+
+---
+
+## PART B: Persona
+
+{persona.md content}
+
+---
+
+## Execution Rules
+
+1. PART B decides first: what attitude to take on this task?
+2. PART A executes: use your technical skills to complete the task
+3. Always maintain PART B's communication style in output
+4. PART B Layer 0 rules have the highest priority and must never be violated
+```
+
+---
+
+## Example session
+
+<Steps>
+  <Step title="Start the command">
+    Type `/create-colleague` in Claude Code.
+  </Step>
+  <Step title="Answer the three intake questions">
+    ```
+    Q: What should we call this colleague?
+    A: qing-yun
+
+    Q: One sentence on basic info — company, level, role, gender.
+    A: ByteDance 2-1 backend engineer male
+
+    Q: One sentence on personality — MBTI, zodiac, traits, culture.
+    A: INTJ Capricorn blame-shifter ByteDance-style strict in CR but never explains why
+    ```
+  </Step>
+  <Step title="Review the summary and confirm">
+    ```
+    Summary:
+      👤  qing-yun
+      🏢  ByteDance 2-1 backend engineer
+      ⚧   male
+      🧠  INTJ Capricorn
+      🏷️   Personality: blame-shifter
+      🏢  Culture: ByteDance-style
+      💬  Impression: strict in CR but never explains why
+
+    Confirm? (confirm / edit [field])
+    ```
+  </Step>
+  <Step title="Choose a data source">
+    Select `[A]` through `[E]`, or press enter to skip and generate from manual info only.
+  </Step>
+  <Step title="Review the generated preview and confirm">
+    Approve or request adjustments to the Work Skill and Persona summaries.
+  </Step>
+  <Step title="Skill is created">
+    ```
+    Colleague Skill created!
+
+    Location: colleagues/qing-yun/
+    Commands: /qing-yun          (full version)
+              /qing-yun-work     (work capabilities only)
+              /qing-yun-persona  (persona only)
+
+    If something feels off, just say "he wouldn't do that" and I'll update it.
+    ```
+  </Step>
+</Steps>

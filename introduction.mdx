@@ -1,0 +1,95 @@
+---
+title: "Introduction"
+description: "colleague.skill turns a departing colleague's messages, docs, and emails into an AI skill that thinks, codes, and communicates just like them."
+keywords: ["colleague skill", "ai skill", "knowledge capture", "feishu", "dingtalk", "claude code"]
+---
+
+Your colleague quit, leaving behind a mountain of unmaintained docs. Your intern left with nothing but an empty desk and a half-finished project. Your mentor graduated, taking all the context and experience with them. Your predecessor handed over, trying to condense three years into three pages.
+
+**colleague.skill** captures that knowledge before it walks out the door.
+
+## What it is
+
+colleague.skill is a [Claude Code](https://claude.ai/code) skill that distills a real person into a reusable AI skill. You provide source materials — Feishu messages, DingTalk docs, Slack threads, emails, PDFs, screenshots — plus a short description of who the person is, and the skill generates an AI agent that embodies their work patterns and personality.
+
+Run `/create-colleague` in Claude Code, answer three questions, choose a data source, and within minutes you have a skill you can invoke with `/{slug}`.
+
+## The problem it solves
+
+When a person leaves a team, two things are lost:
+
+1. **Institutional knowledge** — the technical standards they held, the systems they owned, the workflows they developed
+2. **Interpersonal context** — how they communicated, how they made decisions, how they pushed back
+
+Documentation captures neither well. A three-page handover document covers the "what" but not the "how" or "why". colleague.skill extracts both from the actual record of how they worked.
+
+## Key features
+
+### Automatic data collection
+
+colleague.skill connects directly to the platforms your team uses. For Feishu and Slack, it pulls messages and documents automatically via API. For DingTalk, it collects documents and spreadsheets and falls back to browser scraping for messages. You can also upload PDFs, images, email archives, or paste text directly.
+
+### Two-part skill structure
+
+Every generated skill has two parts that work together:
+
+| Part | What it captures |
+|------|-----------------|
+| **Work Skill (Part A)** | Responsible systems, technical standards, code review preferences, workflows, output formats, accumulated experience |
+| **Persona (Part B)** | 5-layer personality model: hard rules → identity → expression style → decision patterns → interpersonal behavior |
+
+When you invoke the skill, Part B decides the attitude and communication style, and Part A executes the technical work. Output always sounds like them.
+
+### Personality tags
+
+You describe the person in plain language and the skill translates your description into concrete behavior rules. Supported tags include:
+
+- **Personality**: Responsible, Blame-shifter, Perfectionist, Good-enough, Procrastinator, PUA master, Office politician, Passive-aggressive, Flip-flopper, Quiet, Read-no-reply
+- **Corporate culture**: ByteDance-style, Alibaba-style, Tencent-style, Huawei-style, Startup-mode, First-principles, OKR-obsessed
+- **Levels**: ByteDance 2-1 through 3-3+, Alibaba P5–P11, Tencent T1–T4, Baidu T5–T9, Meituan P4–P8, Huawei 13–21, and more
+
+### Continuous evolution
+
+Skills improve over time. Provide new source material and the skill merges the delta into existing sections without overwriting prior conclusions. Correct behavior in conversation ("he wouldn't do that — he should be...") and the correction is written to a dedicated layer that takes effect immediately. Every update is versioned, and you can roll back to any prior version.
+
+## Who it's for
+
+colleague.skill is useful whenever person-dependent knowledge needs to be preserved or transferred:
+
+- **Onboarding** — new team members can query a departing colleague's skill to understand technical context, preferred approaches, and communication norms
+- **Code review continuity** — a senior engineer's review standards can outlive their tenure on the project
+- **Knowledge preservation** — capture institutional knowledge from people transitioning to other roles or leaving the company
+- **Collaboration simulation** — use a colleague's skill as a sounding board when they're unavailable
+
+## Supported data sources
+
+| Source | Messages | Docs / Wiki | Spreadsheets | Notes |
+|--------|:--------:|:-----------:|:------------:|-------|
+| Feishu (auto) | ✅ API | ✅ | ✅ | Enter a name, fully automatic |
+| DingTalk (auto) | ⚠️ Browser | ✅ | ✅ | API doesn't support message history |
+| Slack (auto) | ✅ API | — | — | Requires admin to install Bot; free plan limited to 90 days |
+| WeChat chat history | ✅ SQLite | — | — | Use open-source export tools |
+| PDF | — | ✅ | — | Manual upload |
+| Images / Screenshots | ✅ | — | — | Manual upload |
+| Feishu JSON export | ✅ | ✅ | — | Manual upload |
+| Email `.eml` / `.mbox` | ✅ | — | — | Manual upload |
+| Markdown | ✅ | ✅ | — | Manual upload |
+| Paste text directly | ✅ | — | — | Manual input |
+
+<Note>
+  Source material quality determines skill quality. Chat logs and long-form docs produce far better results than a manual description alone. Prioritize: long-form writing by them > decision-making replies > casual messages.
+</Note>
+
+## Where to go next
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Go from zero to a working colleague skill in 5 minutes
+  </Card>
+  <Card title="Data sources" icon="database" href="/data-sources/overview">
+    Connect Feishu, DingTalk, Slack, email, and more
+  </Card>
+  <Card title="Skill structure" icon="layers" href="/concepts/skill-structure">
+    Understand how Work Skill and Persona fit together
+  </Card>
+</CardGroup>

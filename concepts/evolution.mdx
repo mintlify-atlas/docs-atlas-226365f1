@@ -1,0 +1,196 @@
+---
+title: "Evolution and version control"
+description: "How colleague Skills learn over time — through file appends, conversation corrections, and a version system that lets you roll back to any previous state."
+---
+
+A colleague Skill is not a static snapshot. It improves every time you give it new material or correct its behavior. All changes are versioned automatically, and you can roll back to any previous state at any time.
+
+## Two evolution paths
+
+<CardGroup cols={2}>
+  <Card title="Append files" icon="file-plus">
+    Provide new documents, chat logs, or emails. The Skill analyzes only the delta and merges new findings into the relevant sections without touching existing conclusions.
+  </Card>
+  <Card title="Conversation correction" icon="message-square-warning">
+    Say "he wouldn't do that" or "he should be..." mid-conversation. The correction is classified, formatted, and written to the Correction layer — taking effect immediately.
+  </Card>
+</CardGroup>
+
+## Appending new files
+
+When you provide new source material to an existing Skill, the `merger` prompt handles the update in four steps:
+
+<Steps>
+  <Step title="Classify every piece of new information">
+    Each finding from the new material is routed to either `work.md` or `persona.md`:
+
+    | Information type | Destination |
+    |-----------------|-------------|
+    | Technical standards, code style, interface design, workflows | `work.md` |
+    | Business knowledge, system responsibilities, technical conclusions | `work.md` |
+    | Communication style, catchphrases, expression habits | `persona.md` |
+    | Decision behavior, interpersonal dynamics, emotional patterns | `persona.md` |
+    | Findings that span both | Both files |
+  </Step>
+  <Step title="Check for conflicts">
+    Each new finding is compared against existing content:
+
+    - **Supplements** existing information → appended directly
+    - **Confirms** existing information → ignored (no duplication)
+    - **Contradicts** existing information → a conflict notice is shown to the user:
+
+    ```
+    ⚠️ Conflict found:
+    - Existing: {current description}
+    - New finding: {new content description}
+    - Source: {filename / timestamp}
+
+    Suggestion: [keep existing / update to new / keep both with timestamps]
+    Please decide.
+    ```
+  </Step>
+  <Step title="Archive the current version">
+    Before any changes are written, the current version is automatically snapshotted in `colleagues/{slug}/versions/`. The version counter in `meta.json` increments.
+
+    To manually archive a version before editing, use the rollback tool with the current version label — rollback always snapshots before restoring. To clean up old snapshots:
+
+    ```bash
+    python3 ${CLAUDE_SKILL_DIR}/tools/version_manager.py \
+      --action cleanup \
+      --slug {slug} \
+      --base-dir ./colleagues
+    ```
+  </Step>
+  <Step title="Apply the patch and regenerate SKILL.md">
+    Incremental content is appended to the relevant sections of `work.md` and `persona.md` using the `Edit` tool. `SKILL.md` is then fully regenerated from the updated source files, and `meta.json` is updated with the new version and timestamp.
+  </Step>
+</Steps>
+
+<Note>
+  The merger's core guarantee: **only append, never overwrite**. Existing conclusions are never silently replaced. Conflicts always surface to the user.
+</Note>
+
+## Conversation correction
+
+When the Skill's behavior doesn't match what the real colleague would do, you can correct it inline. The `correction_handler` prompt recognizes these phrases as correction signals:
+
+- "That's wrong" / "Not right" / "Incorrect"
+- "He wouldn't do that" / "He wouldn't say that"
+- "He should be" / "He actually is" / "He tends more toward"
+- "You don't sound like him" / "Doesn't quite feel right"
+- "He would actually..." / "He really..."
+
+### How corrections are processed
+
+<Steps>
+  <Step title="Extract the correction content">
+    The handler identifies three things from the user's statement:
+
+    - **Scenario**: when this behavior occurs (being pushed on deadlines, being questioned, receiving a new task, a technical discussion)
+    - **Wrong behavior**: what the Skill did that didn't match
+    - **Correct behavior**: what the colleague would actually do
+
+    If the statement is ambiguous, the handler asks once to confirm: "I understand — in [scenario], he would [correct behavior], right?"
+  </Step>
+  <Step title="Classify: Work or Persona">
+    | Correction type | Destination |
+    |----------------|-------------|
+    | Work methods, code style, technical judgment | `## Correction Log` in `work.md` |
+    | Communication style, interpersonal behavior, emotional reactions | `## Correction Log` in `persona.md` |
+  </Step>
+  <Step title="Format and preview the record">
+    The correction is formatted as a single executable rule:
+
+    ```
+    - [Scenario: {description}] should NOT {wrong behavior},
+      should instead {correct behavior}
+    ```
+
+    Real examples from the correction handler:
+    ```
+    - [Scenario: questioned on a proposal] should NOT apologize or explain,
+      should instead ask "What's your basis for that judgment?"
+
+    - [Scenario: pushed on timeline] should NOT give a specific date,
+      should instead say "Working on it, almost there" and change the subject
+
+    - [Scenario: writing a CRUD endpoint] should NOT use an ORM,
+      should instead write raw SQL with an index analysis attached
+    ```
+
+    The formatted record is shown to the user for confirmation before being written.
+  </Step>
+  <Step title="Write and regenerate">
+    After confirmation, the record is appended to the `## Correction Log` section and `SKILL.md` is regenerated. The correction takes effect immediately on the next invocation.
+  </Step>
+</Steps>
+
+### Correction layer maintenance
+
+The Correction log in each file is capped at 50 entries. When it exceeds that limit, semantically similar corrections are merged:
+
+- The most recent phrasing is preserved
+- The merge is reported to the user: "Merged {N} similar rules into {M}"
+
+### Conflict handling
+
+If a new correction contradicts an existing rule in the Correction log, the handler surfaces it:
+
+```
+⚠️ This correction conflicts with an existing rule:
+- Existing rule: {existing description}
+- New correction: {new description}
+
+Override with the new correction, or keep both (if they apply to different scenarios)?
+```
+
+## Version control
+
+Every update — whether from a file append or a correction — triggers an automatic archive before the change is applied. Versions are stored in `colleagues/{slug}/versions/` and are identified by their version label (e.g. `v1`, `v2`, `v3`).
+
+The `version_manager.py` tool handles all version operations.
+
+### List versions
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/version_manager.py \
+  --action list \
+  --slug {slug} \
+  --base-dir ./colleagues
+```
+
+Output:
+```
+zhangsan historical versions:
+
+  v1  archived: 2024-03-15 09:12  files: SKILL.md, work.md, persona.md
+  v2  archived: 2024-03-18 14:30  files: SKILL.md, work.md, persona.md
+  v3  archived: 2024-03-22 11:05  files: SKILL.md, work.md, persona.md
+```
+
+### Roll back to a previous version
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/version_manager.py \
+  --action rollback \
+  --slug {slug} \
+  --version v2 \
+  --base-dir ./colleagues
+```
+
+Or using the slash command:
+
+```
+/colleague-rollback {slug} v2
+```
+
+Rollback behavior:
+1. The current version is snapshotted as `{current_version}_before_rollback` before anything changes
+2. `SKILL.md`, `work.md`, and `persona.md` are restored from the target version directory
+3. `meta.json` is updated: `version` is set to `v2_restored`, `rollback_from` records the version that was active before
+
+Up to 10 versions are retained. When the limit is reached, the oldest versions are removed automatically.
+
+<Tip>
+  Because rollback itself creates a snapshot first, you can always undo a rollback by rolling back to the `_before_rollback` version.
+</Tip>

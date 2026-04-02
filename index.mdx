@@ -1,97 +1,80 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "colleague.skill"
+description: "Turn cold goodbyes into warm AI skills. Distill a colleague's work style, technical standards, and personality into a reusable AI skill — from chat logs, docs, and emails."
 ---
 
-## Setting up
+Your colleague quit, leaving behind unmaintained docs. Your intern left with an unfinished project. Your mentor graduated, taking all their context with them.
 
-Get your documentation site up and running in minutes.
+**colleague.skill** lets you distill a real person's work patterns and personality into an AI skill that thinks, codes, and communicates just like them — using their Feishu messages, DingTalk docs, Slack threads, emails, and more.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Install and create your first colleague skill in under 5 minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup for Claude Code and OpenClaw with all optional dependencies
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Data sources" icon="database" href="/data-sources/overview">
+    Connect Feishu, DingTalk, Slack, email, PDFs, and more
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Command reference" icon="terminal" href="/commands/create-colleague">
+    All slash commands and Python tool flags explained
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## How it works
 
-Everything you need to create world-class documentation.
+<Steps>
+  <Step title="Install the skill">
+    Clone the repo into your Claude Code skills directory — the whole repo is the skill.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    ```bash
+    git clone https://github.com/titanwings/colleague-skill ~/.claude/skills/create-colleague
+    ```
+  </Step>
+  <Step title="Run /create-colleague">
+    In Claude Code, type `/create-colleague`. Answer 3 quick questions: alias, company/level/role, and personality tags. All fields except the alias can be skipped.
+  </Step>
+  <Step title="Provide source material">
+    Choose how to import data — auto-collect from Feishu/DingTalk/Slack, upload files, or paste text directly. More material means a more accurate skill.
+  </Step>
+  <Step title="Invoke your colleague">
+    Once created, call the skill with `/{slug}`. It responds with their technical standards, their communication style, and yes — even their tendency to shift blame.
+  </Step>
+</Steps>
 
-## Need inspiration?
+## What gets generated
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+Each colleague skill has two parts that work together:
+
+| Part | What it captures |
+|------|-----------------|
+| **Work Skill** | Technical standards, system ownership, code review preferences, workflows, and accumulated experience |
+| **Persona** | 5-layer personality: hard rules → identity → expression style → decision patterns → interpersonal behavior |
+
+<Tip>
+  The more raw material you provide — especially long-form writing and decision-making replies — the more accurate the generated skill will be.
+</Tip>
+
+## Supported platforms
+
+<CardGroup cols={3}>
+  <Card title="Feishu" icon="message" href="/data-sources/feishu">
+    Auto-collect messages, docs, and spreadsheets via API
+  </Card>
+  <Card title="DingTalk" icon="message" href="/data-sources/dingtalk">
+    Auto-collect docs and spreadsheets; messages via browser
+  </Card>
+  <Card title="Slack" icon="slack" href="/data-sources/slack">
+    Auto-collect channel messages via Bot API
+  </Card>
+  <Card title="Email" icon="envelope" href="/data-sources/manual">
+    Parse .eml and .mbox files automatically
+  </Card>
+  <Card title="PDF & Images" icon="file-pdf" href="/data-sources/manual">
+    Upload documents and screenshots directly
+  </Card>
+  <Card title="Paste text" icon="clipboard" href="/data-sources/manual">
+    Copy-paste any text as raw material
+  </Card>
+</CardGroup>

@@ -1,80 +1,233 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Create your first colleague skill in under 5 minutes — from installation to invoking a working AI skill."
+keywords: ["quickstart", "install", "create-colleague", "claude code", "openclaw"]
 ---
 
-## Get started in three steps
+This guide walks you from a fresh install to a working colleague skill. The whole process takes about 5 minutes if you already have your source material ready.
 
-Get your documentation site running locally and make your first customization.
+<Note>
+  You need [Claude Code](https://claude.ai/code) or [OpenClaw](https://openclaw.dev) installed before you begin. See the [installation guide](/installation) for detailed setup instructions.
+</Note>
 
-### Step 1: Set up your local environment
+## Install the skill
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Clone the repository into your skills directory">
+    colleague.skill follows the [AgentSkills](https://agentskills.io) standard — the entire repository is the skill directory. Clone it directly into Claude Code's skills folder.
 
-### Step 2: Deploy your changes
+    **Project-local install** (available only in this git repo):
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    # Run this at your git repo root
+    mkdir -p .claude/skills
+    git clone https://github.com/titanwings/colleague-skill .claude/skills/create-colleague
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    **Global install** (available in all projects):
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    git clone https://github.com/titanwings/colleague-skill ~/.claude/skills/create-colleague
+    ```
 
-### Step 3: Go live
+    **OpenClaw install**:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```bash
+    git clone https://github.com/titanwings/colleague-skill ~/.openclaw/workspace/skills/create-colleague
+    ```
+
+    <Warning>
+      For a project-local Claude Code install, you must run the `git clone` command at the **git repository root**. Claude Code looks for skills in `.claude/skills/` relative to the repo root.
+    </Warning>
+  </Step>
+
+  <Step title="Install Python dependencies (optional but recommended)">
+    The core skill works without any Python dependencies, but auto-collection from Feishu, DingTalk, and Slack requires them.
+
+    ```bash
+    pip3 install -r requirements.txt
+    ```
+
+    If you only need the basics:
+
+    ```bash
+    pip3 install pypinyin    # Chinese name → slug conversion
+    ```
+
+    See the [installation guide](/installation) for which packages you need based on your data source.
+  </Step>
+
+  <Step title="Verify the install">
+    Open Claude Code in your project and type:
+
+    ```
+    /list-colleagues
+    ```
+
+    If the skill is installed correctly, you'll see an empty list (no colleagues yet). If Claude Code doesn't recognize the command, check that you cloned into the right directory.
+  </Step>
+</Steps>
+
+## Create your first colleague skill
+
+<Steps>
+  <Step title="Run /create-colleague">
+    In Claude Code, type:
+
+    ```
+    /create-colleague
+    ```
+
+    The skill starts an intake dialog. It asks exactly three questions.
+  </Step>
+
+  <Step title="Answer the three intake questions">
+    **Question 1 — Alias (required)**
+
+    Enter a short name or codename for this colleague. This becomes the `{slug}` used to invoke the skill later. For non-ASCII names, the slug is automatically converted to pinyin.
+
+    Example:
+    ```
+    zhangsan
+    ```
+
+    **Question 2 — Basic info (optional)**
+
+    One sentence: company, level, role, gender. Write whatever you know.
+
+    Example:
+    ```
+    ByteDance L2-1 backend engineer male
+    ```
+
+    **Question 3 — Personality profile (optional)**
+
+    One sentence: MBTI, personality tags, corporate culture impressions.
+
+    Example:
+    ```
+    INTJ blame-shifter ByteDance-style strict in CR but never explains why
+    ```
+
+    <Tip>
+      All fields except the alias can be skipped. Even a description alone produces a usable skill. The more you provide, the more accurate the persona will be.
+    </Tip>
+  </Step>
+
+  <Step title="Choose a data source">
+    After the intake questions, the skill presents five options:
+
+    ```
+    How would you like to provide source materials?
+
+      [A] Feishu Auto-Collect (recommended)
+          Enter name, auto-pull messages + docs + spreadsheets
+
+      [B] DingTalk Auto-Collect
+          Enter name, auto-pull docs + spreadsheets
+          Messages collected via browser (DingTalk API doesn't support message history)
+
+      [C] Feishu Link
+          Provide doc/Wiki link (browser session or MCP)
+
+      [D] Upload Files
+          PDF / images / exported JSON / email .eml
+
+      [E] Paste Text
+          Copy-paste text directly
+
+    Can mix and match, or skip entirely (generate from manual info only).
+    ```
+
+    For a quick first run, choose **[E] Paste Text** and paste a few messages or a doc excerpt. You can always add more material later.
+
+    For Feishu auto-collection (the richest source), choose **[A]** and complete the one-time setup:
+
+    ```bash
+    python3 ${CLAUDE_SKILL_DIR}/tools/feishu_auto_collector.py --setup
+    # Enter your Feishu Open Platform App ID and App Secret
+    ```
+
+    Then the skill runs the collector automatically:
+
+    ```bash
+    python3 ${CLAUDE_SKILL_DIR}/tools/feishu_auto_collector.py \
+      --name "Zhang San" \
+      --output-dir ./knowledge/zhangsan \
+      --msg-limit 1000 \
+      --doc-limit 20
+    ```
+  </Step>
+
+  <Step title="Review the preview and confirm">
+    After analyzing the source material, the skill shows a summary before writing any files:
+
+    ```
+    Work Skill Summary:
+      - Responsible for: payment service, order pipeline
+      - Tech stack: Go, Redis, Kafka
+      - CR focus: N+1 queries, response format compliance
+      ...
+
+    Persona Summary:
+      - Core personality: INTJ, blame-deflecting under pressure
+      - Communication style: terse, never explains decisions unprompted
+      - Decision pattern: data-first, dismisses ambiguous requirements
+      ...
+
+    Confirm generation? Or need adjustments?
+    ```
+
+    Type `yes` to generate, or describe what to adjust before confirming.
+  </Step>
+
+  <Step title="Invoke the generated skill">
+    Once created, the skill lives in `colleagues/{slug}/` and is immediately available via three commands:
+
+    | Command | What it does |
+    |---------|-------------|
+    | `/{slug}` | Full skill — Persona + Work |
+    | `/{slug}-work` | Work capabilities only |
+    | `/{slug}-persona` | Persona only |
+
+    For example, with alias `zhangsan`:
+
+    ```
+    /zhangsan Can you review this API design?
+    ```
+
+    The skill responds in their voice, applying their technical standards and their communication style.
+
+    <Tip>
+      If something feels off, just say "he wouldn't do that — he should be..." in the same conversation. The skill records the correction and updates itself immediately.
+    </Tip>
+  </Step>
+</Steps>
+
+## What got created
+
+The skill writes several files to `colleagues/{slug}/`:
+
+```
+colleagues/zhangsan/
+├── SKILL.md            # Full skill (invoke with /zhangsan)
+├── work.md             # Work capabilities only
+├── persona.md          # Persona only
+├── meta.json           # Metadata (name, tags, version)
+├── versions/           # Archived versions for rollback
+└── knowledge/          # Imported source material
+    ├── docs/
+    ├── messages/
+    └── emails/
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Data sources" icon="database" href="/data-sources/overview">
+    Connect Feishu, DingTalk, Slack, and email for richer source material
+  </Card>
+  <Card title="Skill structure" icon="layers" href="/concepts/skill-structure">
+    Understand how Work Skill and Persona work together
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

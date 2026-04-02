@@ -1,0 +1,153 @@
+---
+title: 'Slack'
+description: 'Auto-collect Slack messages from channels and DMs using a Bot Token. Requires workspace admin to install the app.'
+---
+
+The Slack auto-collector finds a target user across all channels the bot has joined, pulls their messages, and outputs a classified text file ready for analysis.
+
+## Prerequisites
+
+- Python 3.9+
+- `pip3 install slack-sdk`
+- Workspace **admin permissions** to install a Slack App (or ask your admin to do it)
+
+<Note>
+  Free Workspace plans only retain the last **90 days** of messages. Pro, Business+, and Enterprise plans have no limit.
+</Note>
+
+---
+
+## Setup
+
+<Steps>
+  <Step title="Create a Slack App">
+    1. Go to [https://api.slack.com/apps](https://api.slack.com/apps) and click **Create New App**
+    2. Choose **From scratch**
+    3. Enter an App Name (e.g., `colleague-skill-bot`) and select your target Workspace
+    4. Click **Create App**
+  </Step>
+  <Step title="Configure Bot Token Scopes">
+    In the left sidebar, go to **OAuth & Permissions** → **Bot Token Scopes** → **Add an OAuth Scope**.
+
+    Add the following scopes:
+
+    | Scope | Purpose | Required |
+    |-------|---------|----------|
+    | `users:read` | Search the user list | Required |
+    | `channels:read` | List public channels | Required |
+    | `channels:history` | Read public channel messages | Required |
+    | `groups:read` | List private channels | Required |
+    | `groups:history` | Read private channel messages | Required |
+    | `mpim:read` | List group DMs | Optional |
+    | `mpim:history` | Read group DM messages | Optional |
+    | `im:read` | List direct messages | Optional |
+    | `im:history` | Read direct message history | Optional |
+  </Step>
+  <Step title="Install the App to your Workspace">
+    1. Still on the **OAuth & Permissions** page, click **Install to Workspace**
+    2. A workspace admin must approve the installation
+    3. After approval, copy the **Bot User OAuth Token** — it starts with `xoxb-`
+  </Step>
+  <Step title="Invite the bot to target channels">
+    The bot can only read channels it has been added to. In Slack, open each relevant channel and run:
+
+    ```
+    /invite @colleague-skill-bot
+    ```
+
+    <Tip>
+      If you're not sure which channels the target user is in, you can run the collector first — it will list the channels the bot has joined. Then invite the bot to any additional channels and re-run.
+    </Tip>
+  </Step>
+  <Step title="Run the setup wizard">
+    ```bash
+    pip3 install slack-sdk
+    python3 tools/slack_auto_collector.py --setup
+    ```
+
+    Paste in your Bot User OAuth Token when prompted. The script validates the token against the Slack API and saves it to `~/.colleague-skill/slack_config.json`.
+
+    A successful setup looks like:
+
+    ```
+    Validating token ... OK
+      Workspace: Your Company, Bot: colleague-skill-bot
+
+    ✅ Config saved to /Users/you/.colleague-skill/slack_config.json
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Running the collector
+
+### Basic usage
+
+```bash
+# Search by display name
+python3 tools/slack_auto_collector.py --name "Jane Smith"
+
+# Search by Slack username
+python3 tools/slack_auto_collector.py --name "jane.smith"
+```
+
+### Specify output directory
+
+```bash
+python3 tools/slack_auto_collector.py \
+  --name "Jane Smith" \
+  --output-dir ./knowledge/jane
+```
+
+### Limit collection size
+
+For large workspaces, start with a smaller sample:
+
+```bash
+python3 tools/slack_auto_collector.py \
+  --name "Jane Smith" \
+  --msg-limit 500 \
+  --channel-limit 20
+```
+
+---
+
+## All CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | — | Colleague name or Slack username (required) |
+| `--output-dir` | `./knowledge/{name}` | Directory to write output files |
+| `--msg-limit` | `1000` | Maximum total messages to collect |
+| `--channel-limit` | `50` | Maximum number of channels to check for membership |
+| `--setup` | — | Run the interactive setup wizard |
+
+---
+
+## Output files
+
+```
+knowledge/jane/
+├── messages.txt            # Messages classified by type and weight
+└── collection_summary.json # User info, channels found, timestamp
+```
+
+The `messages.txt` file is organized into three sections by weight:
+
+1. **Thread-starter messages** (highest weight) — posts that other people replied to. These reveal opinions, decisions, and technical positions.
+2. **Long messages (>50 chars)** — detailed explanations, proposals, and discussion.
+3. **Short/daily messages** — useful for capturing communication style and vocabulary.
+
+---
+
+## Common errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `missing_scope: channels:history` | Bot Token is missing a required scope | Go to api.slack.com → OAuth & Permissions → add the scope, then reinstall the app |
+| `invalid_auth` | Token is invalid or has been revoked | Re-run `--setup` to configure a new token |
+| `not_in_channel` | Bot has not been added to the channel | In Slack, run `/invite @your-bot-name` in the channel |
+| User not found | Name spelling is incorrect | Try the English username (e.g., `jane.smith`) or the Slack display name |
+| Only 90 days of messages | Free Workspace plan limitation | Upgrade the Workspace plan, or supplement with screenshot uploads |
+| Rate limit (HTTP 429) | Too many API requests | The script handles this automatically with exponential backoff — no action needed |

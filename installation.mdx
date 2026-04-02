@@ -1,0 +1,284 @@
+---
+title: "Installation"
+description: "Install colleague.skill for Claude Code or OpenClaw, then set up Python dependencies for your data sources."
+keywords: ["installation", "claude code", "openclaw", "python dependencies", "feishu", "slack", "setup"]
+---
+
+colleague.skill follows the [AgentSkills](https://agentskills.io) standard: the entire repository is the skill directory. Installation means cloning it to the right place.
+
+## Choose your platform
+
+### Claude Code
+
+Claude Code looks for skills in `.claude/skills/` at the **git repository root**. You can install the skill project-locally (available in one repo) or globally (available in all projects).
+
+<Steps>
+  <Step title="Project-local install">
+    Run this from the root of your git repository:
+
+    ```bash
+    # Make sure you're at the repo root
+    cd $(git rev-parse --show-toplevel)
+
+    mkdir -p .claude/skills
+    git clone https://github.com/titanwings/colleague-skill .claude/skills/create-colleague
+    ```
+
+    Generated colleague skills are written to `./colleagues/` inside your project.
+
+    <Warning>
+      Claude Code only finds skills in `.claude/skills/` at the repo root. Running this command in a subdirectory will not work.
+    </Warning>
+  </Step>
+
+  <Step title="Global install (alternative)">
+    Install once and the skill is available in every project:
+
+    ```bash
+    git clone https://github.com/titanwings/colleague-skill ~/.claude/skills/create-colleague
+    ```
+  </Step>
+
+  <Step title="Verify">
+    Open Claude Code in any project and type:
+
+    ```
+    /list-colleagues
+    ```
+
+    A successful response (even an empty list) confirms the skill is installed.
+  </Step>
+</Steps>
+
+### OpenClaw
+
+```bash
+git clone https://github.com/titanwings/colleague-skill ~/.openclaw/workspace/skills/create-colleague
+```
+
+Restart your OpenClaw session, then type `/create-colleague` to start.
+
+---
+
+## Python dependencies
+
+The skill's core flow — generating a skill from pasted text or uploaded files — works without any Python packages. Python dependencies are only needed for auto-collection from external platforms.
+
+### Install all dependencies
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### Package reference
+
+| Package | Version | Required | Purpose |
+|---------|---------|----------|---------|
+| `requests` | ≥ 2.28.0 | Yes | HTTP calls used by all collector scripts |
+| `pypinyin` | ≥ 0.48.0 | Recommended | Converts Chinese names to pinyin slugs (e.g. `张三` → `zhangsan`) |
+| `playwright` | ≥ 1.40.0 | Feishu browser / DingTalk messages | Browser automation for Feishu docs requiring login, and DingTalk message scraping |
+| `slack-sdk` | ≥ 3.27.0 | Slack auto-collect | Slack Bot API client |
+| `python-docx` | ≥ 1.1.0 | Word file upload | Parses `.docx` files to plain text |
+| `openpyxl` | ≥ 3.1.0 | Excel file upload | Converts `.xlsx` spreadsheets to CSV |
+
+### Install by scenario
+
+<CodeGroup>
+
+```bash Feishu (API method)
+# Feishu auto-collect via App Token
+pip3 install requests pypinyin
+```
+
+```bash Feishu (browser method)
+# Feishu docs requiring login credentials
+pip3 install requests pypinyin playwright
+playwright install chromium
+```
+
+```bash DingTalk
+# DingTalk docs (API) + messages (browser scraping)
+pip3 install requests pypinyin playwright
+playwright install chromium
+```
+
+```bash Slack
+# Slack auto-collect via Bot API
+pip3 install requests pypinyin slack-sdk
+```
+
+```bash Word / Excel uploads
+# Parse .docx and .xlsx files
+pip3 install requests pypinyin python-docx openpyxl
+```
+
+</CodeGroup>
+
+<Note>
+  Playwright only needs the Chromium browser — not a full Chrome installation. The `playwright install chromium` command downloads a self-contained Chromium binary (~150 MB).
+</Note>
+
+---
+
+## Platform setup guide
+
+After installing the right packages, you need to configure credentials for each platform's auto-collector. Each tool has a `--setup` wizard that walks you through this.
+
+### Feishu
+
+Feishu offers three access methods depending on what you need to collect:
+
+| Scenario | Method | Tool |
+|----------|--------|------|
+| Group messages + docs (App permission) | API auto-collect | `feishu_auto_collector.py` |
+| Internal docs without App permission | Browser session | `feishu_browser.py` |
+| Specific doc/Wiki links | MCP App Token | `feishu_mcp_client.py` |
+
+**Auto-collect setup** (requires a Feishu Open Platform App with Bot added to relevant groups):
+
+```bash
+python3 tools/feishu_auto_collector.py --setup
+# Enter your App ID and App Secret from Feishu Open Platform
+```
+
+**Browser method** (first use opens a login window; session is reused after that):
+
+```bash
+python3 tools/feishu_browser.py \
+  --url "https://xxx.feishu.cn/wiki/xxx" \
+  --show-browser    # Add on first use; not needed after login
+```
+
+**MCP method** (for specific links):
+
+```bash
+python3 tools/feishu_mcp_client.py --setup
+```
+
+The Feishu MCP method also requires the `feishu-mcp` npm package:
+
+```bash
+npm install -g feishu-mcp    # Requires Node.js 16+
+```
+
+### DingTalk
+
+DingTalk's API supports documents and spreadsheets but not message history. Messages are collected via browser automation.
+
+```bash
+python3 tools/dingtalk_auto_collector.py --setup
+# Enter your DingTalk Open Platform AppKey and AppSecret
+
+# First run: add --show-browser to complete the DingTalk login
+python3 tools/dingtalk_auto_collector.py --name "Zhang San" --show-browser
+```
+
+### Slack
+
+Slack auto-collection requires a Bot installed in your Workspace. This needs Workspace admin approval.
+
+<Steps>
+  <Step title="Create a Slack App">
+    Go to [https://api.slack.com/apps](https://api.slack.com/apps), click **Create New App**, choose **From scratch**, and select your target Workspace.
+  </Step>
+
+  <Step title="Add Bot Token Scopes">
+    In **OAuth & Permissions → Bot Token Scopes**, add these scopes:
+
+    | Scope | Purpose |
+    |-------|---------|
+    | `users:read` | Find users by name |
+    | `channels:read` | List public channels |
+    | `channels:history` | Read public channel messages |
+    | `groups:read` | List private channels |
+    | `groups:history` | Read private channel messages |
+    | `mpim:read` | List group DMs (optional) |
+    | `mpim:history` | Read group DM messages (optional) |
+    | `im:read` | List DMs (optional, requires user auth) |
+    | `im:history` | Read DM messages (optional, requires user auth) |
+  </Step>
+
+  <Step title="Install the App to your Workspace">
+    Click **Install to Workspace** in **OAuth & Permissions**. After admin approval, copy the **Bot User OAuth Token** (starts with `xoxb-`).
+  </Step>
+
+  <Step title="Invite the Bot to target channels">
+    The Bot can only read channels it has joined. In each relevant channel, run:
+
+    ```
+    /invite @your-bot-name
+    ```
+  </Step>
+
+  <Step title="Run the setup wizard">
+    ```bash
+    pip3 install slack-sdk
+    python3 tools/slack_auto_collector.py --setup
+    # Paste the Bot User OAuth Token when prompted
+    ```
+
+    On success:
+    ```
+    Verifying token ... OK
+      Workspace: Your Company, Bot: colleague-skill-bot
+
+    Config saved to /Users/you/.colleague-skill/slack_config.json
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Free Slack Workspaces only retain 90 days of message history. For older messages, upgrade the Workspace or supplement with uploaded screenshots.
+</Warning>
+
+---
+
+## Verify your install
+
+Run these checks from the skill directory to confirm each component works:
+
+```bash
+cd ~/.claude/skills/create-colleague   # or .claude/skills/create-colleague in your project
+
+# Test the Slack collector
+python3 tools/slack_auto_collector.py --help
+
+# Test the email parser
+python3 tools/email_parser.py --help
+
+# List any existing colleague skills
+python3 tools/skill_writer.py --action list --base-dir ./colleagues
+```
+
+---
+
+## Directory structure
+
+For reference, here is what the installed skill directory looks like:
+
+```
+create-colleague/
+├── SKILL.md              # Skill entry point
+├── prompts/              # Prompt templates used during generation
+│   ├── intake.md
+│   ├── work_analyzer.md
+│   ├── persona_analyzer.md
+│   ├── work_builder.md
+│   ├── persona_builder.md
+│   ├── merger.md
+│   └── correction_handler.md
+├── tools/                # Python collector and utility scripts
+│   ├── feishu_auto_collector.py
+│   ├── feishu_browser.py
+│   ├── feishu_mcp_client.py
+│   ├── dingtalk_auto_collector.py
+│   ├── slack_auto_collector.py
+│   ├── email_parser.py
+│   ├── skill_writer.py
+│   └── version_manager.py
+├── colleagues/           # Generated colleague skills (gitignored)
+├── requirements.txt
+└── LICENSE
+```
+
+Generated colleague skills are stored in `colleagues/{slug}/` and are excluded from git by default.

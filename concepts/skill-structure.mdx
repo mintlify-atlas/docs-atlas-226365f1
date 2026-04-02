@@ -1,0 +1,136 @@
+---
+title: "Skill structure"
+description: "How a generated colleague Skill is organized — the two-part Work + Persona design and the execution flow that runs between them."
+---
+
+Each colleague Skill is a self-contained directory under `colleagues/{slug}/`. It combines two complementary parts that work in sequence every time you invoke the Skill.
+
+## The two-part design
+
+<CardGroup cols={2}>
+  <Card title="Part A — Work Skill" icon="wrench">
+    Captures the colleague's technical domain: the systems they own, the standards they enforce, the workflows they follow, and the accumulated experience they'd bring to any task.
+  </Card>
+  <Card title="Part B — Persona" icon="user">
+    Captures who they are as a person: a 5-layer personality model covering hard rules, identity, communication style, decision patterns, and interpersonal behavior.
+  </Card>
+</CardGroup>
+
+### Execution flow
+
+Every invocation runs the two parts in order:
+
+<Steps>
+  <Step title="Receive task">
+    The Skill receives the user's request.
+  </Step>
+  <Step title="Persona decides attitude">
+    Part B evaluates the task through the colleague's personality layers — their priorities, communication style, and behavioral rules — and determines how they would approach it.
+  </Step>
+  <Step title="Work Skill executes">
+    Part A applies the colleague's domain knowledge: their technical standards, preferred workflows, and experience library.
+  </Step>
+  <Step title="Output in their voice">
+    The response is delivered in the colleague's authentic expression style, as defined in Part B Layer 2.
+  </Step>
+</Steps>
+
+<Note>
+  Layer 0 (hard rules) in Part B has the highest priority. Its rules are never overridden, regardless of what the task asks for.
+</Note>
+
+## Directory structure
+
+Every colleague lives in `colleagues/{slug}/`. The layout is:
+
+| Path | Description |
+|------|-------------|
+| `colleagues/{slug}/SKILL.md` | The invocable Skill entry point. Assembles Part A and Part B into a single runnable file with execution rules. |
+| `colleagues/{slug}/work.md` | Part A source file. Contains responsibility scope, technical standards, workflow, output style, and experience library. |
+| `colleagues/{slug}/persona.md` | Part B source file. Contains all 5 persona layers, example dialogue, and the Correction log. |
+| `colleagues/{slug}/meta.json` | Skill metadata: identity fields, tags, version, timestamps, and knowledge source inventory. |
+| `colleagues/{slug}/versions/` | Auto-archived snapshots of every previous version. Used for rollback. |
+| `colleagues/{slug}/knowledge/docs/` | Imported documents (Feishu docs, PDFs, wikis). |
+| `colleagues/{slug}/knowledge/messages/` | Imported message records (group chats, private chats). |
+| `colleagues/{slug}/knowledge/emails/` | Imported email files (`.eml`, `.mbox`). |
+
+## The SKILL.md file
+
+`SKILL.md` is what the agent actually loads when you run `/{slug}`. It is regenerated automatically whenever `work.md` or `persona.md` changes. Its structure:
+
+```markdown
+---
+name: colleague-{slug}
+description: {name}, {company} {level} {role}
+user-invocable: true
+---
+
+# {name}
+
+{company} {level} {role}
+
+---
+
+## PART A: Work Capabilities
+
+{full work.md content}
+
+---
+
+## PART B: Persona
+
+{full persona.md content}
+
+---
+
+## Execution Rules
+
+1. PART B decides first: what attitude to take on this task?
+2. PART A executes: use your technical skills to complete the task
+3. Always maintain PART B's communication style in output
+4. PART B Layer 0 rules have the highest priority and must never be violated
+```
+
+The two sub-variants `/{slug}-work` and `/{slug}-persona` load only their respective part, letting you invoke work capabilities or persona behavior in isolation.
+
+## The meta.json schema
+
+`meta.json` tracks the Skill's identity and lifecycle. All fields are written on creation and kept in sync on every update.
+
+```json
+{
+  "name": "{name}",
+  "slug": "{slug}",
+  "created_at": "{ISO 8601 timestamp}",
+  "updated_at": "{ISO 8601 timestamp}",
+  "version": "v1",
+  "profile": {
+    "company": "{company}",
+    "level": "{level}",
+    "role": "{role}",
+    "gender": "{gender}",
+    "mbti": "{mbti}"
+  },
+  "tags": {
+    "personality": ["blame-shifter", "ByteDance-style"],
+    "culture": ["ByteDance-style"]
+  },
+  "impression": "{free-text impression from the creator}",
+  "knowledge_sources": ["knowledge/messages/messages.txt", "knowledge/docs/docs.txt"],
+  "corrections_count": 0
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name or alias of the colleague |
+| `slug` | string | URL-safe identifier used in commands and file paths |
+| `created_at` | ISO 8601 | When the Skill was first created |
+| `updated_at` | ISO 8601 | Last time any file was updated |
+| `version` | string | Current version label (e.g. `v1`, `v3`, `v2_restored`) |
+| `profile` | object | Structured identity: company, level, role, gender, MBTI |
+| `tags.personality` | array | Personality tags applied (e.g. `blame-shifter`, `perfectionist`) |
+| `tags.culture` | array | Corporate culture tags applied (e.g. `ByteDance-style`) |
+| `impression` | string | Free-text subjective impression provided at creation time |
+| `knowledge_sources` | array | List of all imported files that informed the Skill |
+| `corrections_count` | integer | Number of conversation corrections applied over the Skill's lifetime |

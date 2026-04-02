@@ -1,0 +1,185 @@
+---
+title: Best practices
+description: How to get the most accurate and useful colleague Skills — from choosing source material to iterative refinement.
+---
+
+The quality of a generated colleague Skill is directly determined by the quality of the source material you provide. This page covers how to select the right sources, write effective personality tags, refine Skills over time, and choose the right collection strategy per platform.
+
+## Source material quality
+
+### Priority ranking
+
+Not all messages are equally useful. When deciding what to collect, prioritize in this order:
+
+1. **Long-form writing by them** — technical docs, design decisions, RFCs, post-mortems, wiki pages, PRD drafts. These reveal their thinking structure, standards, and vocabulary most clearly.
+2. **Decision-making replies** — their responses during design reviews, code review comments, architecture discussions, product debates. These show how they reason and what they prioritize.
+3. **Casual messages** — useful for expression style and interpersonal behavior, but carry less signal for Work Skill extraction.
+
+### Why quality matters more than quantity
+
+The analyzers (`work_analyzer.md` and `persona_analyzer.md`) are instructed to only write conclusions with direct evidence — dimensions with insufficient material are explicitly marked as `(insufficient source material)`. Feeding 500 low-signal messages produces a weaker result than feeding 50 code review comments and one design doc.
+
+The persona analyzer also notes: "there is no need to infer — only write what is evidenced."
+
+### What makes a good source
+
+| Source type | Useful for | Why |
+|---|---|---|
+| Technical design docs | Work Skill | Reveals responsible systems, tech standards, decision framework |
+| Code review comments | Work Skill + Persona | Shows CR standards, style, and how they give feedback |
+| Wiki / runbooks they authored | Work Skill | Captures domain expertise and documentation style |
+| Long Slack/Feishu messages | Persona | Exposes communication style, vocabulary, sentence structure |
+| Email threads | Persona + Work | Formal writing style + cross-team coordination behavior |
+| Meeting notes / decisions | Work Skill + Persona | Shows decision patterns and how they drive or block progress |
+| DingTalk / Feishu docs | Work Skill | Documents they created reveal what they own and how they think |
+
+### What to avoid
+
+These sources add noise without meaningful signal:
+
+- **Emoji-only messages** — no textual content to analyze
+- **System messages** — the auto-collectors filter these out automatically
+- **Short acknowledgments** — "ok", "noted", "got it", "+1", reactions
+- **Off-topic group chat** — casual social messages in work channels
+
+<Tip>
+The Feishu auto-collector already filters system messages and sticker-only messages before output. For manual uploads, consider cleaning the source before providing it.
+</Tip>
+
+---
+
+## Persona accuracy
+
+### Use specific personality tags, not vague descriptions
+
+When filling in the personality profile during `/create-colleague`, specificity dramatically improves the result. The persona analyzer translates tags directly into Layer 0 behavior rules.
+
+**Less effective:**
+```
+personality: difficult to work with, opinionated
+```
+
+**More effective:**
+```
+INTJ, blame-shifter, ByteDance-style, strict in CR but never explains why
+```
+
+The second example maps to concrete rules:
+- `blame-shifter` → "first reaction to problems is finding external causes; proactively blurs own responsibility boundaries before issues arise; when questioned, opens with 'the requirements weren't clear' or 'this wasn't my area'"
+- `ByteDance-style` → "always demands context before engaging; evaluates proposals by asking 'what's the impact?'; uses phrases like 'is this take correct?'; treats directness as a virtue"
+
+### How to combine corporate culture tags with personality tags
+
+Corporate culture tags and personality tags work at different layers. Culture tags define default vocabulary, communication norms, and process expectations. Personality tags define behavior patterns and interpersonal tendencies. Combining them produces the most realistic results.
+
+**Example from the demo:**
+```
+ByteDance L2-1 backend engineer, INTJ, blame-shifter, ByteDance-style, strict in CR but never explains why
+```
+
+This generates a persona where:
+- The **culture tag** (`ByteDance-style`) sets the vocabulary ("context", "impact", "OKR alignment") and communication norms (direct, confrontational)
+- The **personality tag** (`blame-shifter`) adds specific deflection behaviors on top of that cultural baseline
+- The **role** (`L2-1 backend engineer`) grounds the Work Skill in the right technical depth and scope
+- The **custom impression** (`strict in CR but never explains why`) adds a specific behavioral quirk that neither tag covers
+
+### Supported tags reference
+
+**Personality tags:** Responsible · Blame-shifter · Perfectionist · Good-enough · Procrastinator · PUA master · Office politician · Managing-up expert · Passive-aggressive · Flip-flopper · Quiet · Read-no-reply
+
+**Corporate culture tags:** ByteDance-style · Alibaba-style · Tencent-style · Huawei-style · Baidu-style · Meituan-style · First-principles · OKR-obsessed · Big-corp-pipeline · Startup-mode
+
+**Level tags:** ByteDance 2-1 to 3-3+ · Alibaba P5–P11 · Tencent T1–T4 · Baidu T5–T9 · Meituan P4–P8 · Huawei 13–21 · NetEase · JD · Xiaomi
+
+---
+
+## Iterative improvement
+
+### Using correction mode to refine an inaccurate Skill
+
+After using `/{slug}`, if the responses feel off, use natural language correction:
+
+```
+He wouldn't do that. He never deflects like that — he's actually very direct about owning mistakes.
+```
+
+```
+That's wrong. He would never use tables in a design doc, he always writes dense paragraphs.
+```
+
+The skill records this as a Correction entry in the relevant file (`work.md` or `persona.md`) under a `## Correction Log` section, then regenerates `SKILL.md`. Correction layer rules take effect immediately and override earlier generated content.
+
+### When to append new files vs start fresh
+
+**Append new files** when:
+- You have additional source material from the same person
+- The existing Skill is mostly accurate and you want to fill gaps
+- You want to add a specific domain (e.g., the existing Skill has good Work content but weak Persona)
+
+The merge logic (`merger.md`) analyzes incremental content and only updates relevant sections — it never overwrites existing conclusions.
+
+**Start fresh** when:
+- The initial source material was very sparse (description-only) and you now have substantial files
+- The generated Skill has fundamental mismatches across multiple dimensions
+- The person's role or company has changed significantly
+
+### Testing Work and Persona separately
+
+Use `/{slug}-work` and `/{slug}-persona` to isolate which part needs refinement:
+
+- If the technical advice is correct but the tone is wrong → the Persona needs correction
+- If the personality feels accurate but the technical content is off → the Work Skill needs more source material or correction
+- Use targeted corrections: "For the work side, he would insist on N+1 query checks in every CR" vs "For his personality, he would never publicly embarrass someone"
+
+---
+
+## Data source strategy by platform
+
+### Feishu
+
+Prefer the auto-collector (`feishu_auto_collector.py`) over manual export. The auto-collector pulls:
+- All messages the target sent in shared group chats (system messages and stickers filtered)
+- Feishu docs and Wikis they created or edited
+- Related spreadsheets (if accessible)
+
+For internal documents that require login (no App permission), use `feishu_browser.py` instead — it reuses your local browser's login session.
+
+<Warning>
+The Feishu bot must be added to target group chats before collection. The auto-collector can only read channels the bot has joined.
+</Warning>
+
+For private chat (P2P) messages, `user_access_token` is required — app identity cannot access private chats. This requires an additional OAuth authorization step. See the Feishu setup flow in INSTALL.md.
+
+### DingTalk
+
+Start with docs: the DingTalk API fully supports document and knowledge base access. Collect docs first with `dingtalk_auto_collector.py --setup`, then add `--show-browser` on first run to complete the DingTalk login via browser.
+
+For messages: the DingTalk API does not support historical message retrieval. The auto-collector automatically falls back to browser-based scraping for messages. If this also fails, have the colleague export chat screenshots and upload them manually.
+
+### Slack
+
+Ensure the bot is invited to all relevant channels before running collection — the bot can only read channels it has joined. If you don't know which channels the target uses, run collection once first; the output summary reports which channels were scanned. Then invite the bot to missing channels and re-run.
+
+<Note>
+Free Slack workspaces only retain message history for the last 90 days. If the colleague has been at the company for longer, consider supplementing with any exported docs, emails, or manually pasted content.
+</Note>
+
+---
+
+## Data source contribution matrix
+
+This table shows what each source type contributes to Work Skill quality vs Persona quality:
+
+| Source | Work Skill | Persona | Notes |
+|---|---|---|---|
+| Feishu docs / wiki | High | Low | Best for systems, standards, domain knowledge |
+| DingTalk docs / wiki | High | Low | Same as Feishu docs |
+| Code review comments | High | High | Reveals both standards and communication style |
+| Group chat messages | Low | High | Expression style, vocabulary, social behavior |
+| Private chat messages | Low | High | More candid; reveals decision patterns |
+| Long design messages | High | Medium | Structured thinking + some communication style |
+| Email threads | Medium | High | Formal writing style + interpersonal dynamics |
+| Spreadsheets | Medium | Low | Workflow and analytical approach |
+| PDF documents | High | Low | Depends on content type |
+| Screenshots | Low | Medium | Hard to extract structure; useful for tone |
+| Manual description only | Low | Medium | Relies entirely on your subjective impression |

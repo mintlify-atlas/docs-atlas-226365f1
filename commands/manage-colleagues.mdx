@@ -1,0 +1,348 @@
+---
+title: "Managing colleagues"
+description: "Reference for invoking, listing, updating, rolling back, and deleting colleague skills."
+---
+
+Once a colleague skill is created, a set of commands lets you invoke it, evolve it over time, and manage its lifecycle.
+
+---
+
+## Invoke commands
+
+### `/{slug}`
+
+Invoke the full colleague skill — both Work capabilities (Part A) and Persona (Part B) are active.
+
+**Syntax:**
+
+```
+/{slug}
+```
+
+**What it does:**
+Loads `colleagues/{slug}/SKILL.md`. The persona decides how to approach the task; the work skill executes it; output is delivered in the colleague's voice and style.
+
+**Example:**
+
+```
+/qing-yun Can you review this API design?
+```
+
+---
+
+### `/{slug}-work`
+
+Invoke work capabilities only, without the persona layer.
+
+**Syntax:**
+
+```
+/{slug}-work
+```
+
+**What it does:**
+Loads `colleagues/{slug}/SKILL.md` with only Part A (Work Capabilities) active. Useful when you want the colleague's technical knowledge and standards applied without personality simulation.
+
+**Example:**
+
+```
+/qing-yun-work What's the standard response format for our APIs?
+```
+
+---
+
+### `/{slug}-persona`
+
+Invoke the persona only, without work capabilities.
+
+**Syntax:**
+
+```
+/{slug}-persona
+```
+
+**What it does:**
+Loads `colleagues/{slug}/SKILL.md` with only Part B (Persona) active. Useful for communication simulation, writing in their voice, or understanding how they'd react socially.
+
+**Example:**
+
+```
+/qing-yun-persona How would they respond to a deadline slip?
+```
+
+---
+
+### `/list-colleagues`
+
+List all generated colleague skills in the current project.
+
+**Syntax:**
+
+```
+/list-colleagues
+```
+
+**What it does:**
+Runs `skill_writer.py --action list` and prints each colleague's slug, name, identity, version, correction count, and last updated date.
+
+**Underlying tool call:**
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/skill_writer.py --action list --base-dir ./colleagues
+```
+
+**Example output:**
+
+```
+2 colleague skills found:
+
+  [qing-yun]  Qing Yun — ByteDance 2-1 backend engineer, MBTI INTJ
+    Version: v3  Corrections: 2  Updated: 2026-04-02
+
+  [big-mike]  Big Mike — Tencent T3-1 product manager
+    Version: v1  Corrections: 0  Updated: 2026-03-15
+```
+
+---
+
+### `/colleague-rollback {slug} {version}`
+
+Roll back a colleague skill to a previously archived version.
+
+**Syntax:**
+
+```
+/colleague-rollback {slug} {version}
+```
+
+<ParamField path="slug" type="string" required>
+  The slug of the colleague to roll back. Must match a directory under `colleagues/`.
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  The version label to restore, e.g. `v2` or `v3`. Use `/list-colleagues` or inspect `colleagues/{slug}/versions/` to see available versions.
+</ParamField>
+
+**What it does:**
+Before restoring, the current version is automatically archived to `colleagues/{slug}/versions/{current_version}_before_rollback/`. Then `SKILL.md`, `work.md`, and `persona.md` are restored from the target version directory. The `meta.json` is updated to reflect the restored version label and timestamp.
+
+**Underlying tool call:**
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/tools/version_manager.py \
+  --action rollback \
+  --slug qing-yun \
+  --version v2 \
+  --base-dir ./colleagues
+```
+
+**Example:**
+
+```
+/colleague-rollback qing-yun v2
+```
+
+Output:
+
+```
+Rolled back to v2. Restored files: SKILL.md, work.md, persona.md
+```
+
+<Note>
+  The rollback creates a safety snapshot of the current state before overwriting, so you can always roll back the rollback by targeting the `{version}_before_rollback` label.
+</Note>
+
+---
+
+### `/delete-colleague {slug}`
+
+Permanently delete a colleague skill.
+
+**Syntax:**
+
+```
+/delete-colleague {slug}
+```
+
+<ParamField path="slug" type="string" required>
+  The slug of the colleague to delete. The entire `colleagues/{slug}/` directory is removed, including all versions and knowledge archives.
+</ParamField>
+
+**What it does:**
+After user confirmation, removes the directory:
+
+```bash
+rm -rf colleagues/{slug}
+```
+
+**Example:**
+
+```
+/delete-colleague qing-yun
+```
+
+---
+
+## Evolution mode
+
+Colleague skills are designed to improve over time. Two triggers enter evolution mode.
+
+### Append mode — add new source material
+
+**Triggers:**
+
+| Input | Description |
+|-------|-------------|
+| "I have new files" | Natural language |
+| "append" | Natural language shorthand |
+| `/update-colleague {slug}` | Explicit slash command |
+
+**What happens:**
+
+<Steps>
+  <Step title="New content is read">
+    Provide files or paste text using the same options as `/create-colleague` (Feishu, DingTalk, upload, paste).
+  </Step>
+  <Step title="Existing skill is loaded">
+    The current `colleagues/{slug}/work.md` and `persona.md` are read.
+  </Step>
+  <Step title="Current version is archived">
+    The current version is automatically snapshotted in `colleagues/{slug}/versions/` before any changes are applied. This happens internally — no separate command is required.
+  </Step>
+  <Step title="Incremental content is merged">
+    New findings are appended to the relevant sections of `work.md` and `persona.md`. Existing conclusions are never overwritten.
+  </Step>
+  <Step title="SKILL.md and meta.json are regenerated">
+    The combined skill file and metadata are updated with the new version number and timestamp.
+  </Step>
+</Steps>
+
+---
+
+### Correction mode — fix inaccuracies mid-conversation
+
+**Triggers:**
+
+| Input | Description |
+|-------|-------------|
+| "That's wrong" | Signals inaccuracy |
+| "He wouldn't do that" | Behavioral correction |
+| "He should be ..." | Replacement description |
+
+**What happens:**
+
+The correction is classified as either a Work correction (technical behavior, workflow) or a Persona correction (personality, communication style). A structured record is appended to a `## Correction Log` section in the relevant file:
+
+```
+- [code review] Should not dismiss concerns without explanation; should provide specific reasons for rejections
+```
+
+`SKILL.md` is regenerated immediately so the correction takes effect in the next invocation.
+
+<Tip>
+  Corrections accumulate in `meta.json` under `corrections_count`. You can see the total for each colleague in `/list-colleagues` output.
+</Tip>
+
+---
+
+## Python tools — direct usage
+
+The underlying Python tools can be called directly from a terminal for scripting or batch operations.
+
+### `skill_writer.py`
+
+Manages the colleague skill directory structure.
+
+**List all colleagues:**
+
+```bash
+python3 tools/skill_writer.py --action list --base-dir ./colleagues
+```
+
+**Create a skill from files:**
+
+```bash
+python3 tools/skill_writer.py \
+  --action create \
+  --slug qing-yun \
+  --meta /tmp/meta.json \
+  --work /tmp/work_content.md \
+  --persona /tmp/persona_content.md \
+  --base-dir ./colleagues
+```
+
+**Apply an incremental update:**
+
+```bash
+python3 tools/skill_writer.py \
+  --action update \
+  --slug qing-yun \
+  --work-patch /tmp/work_patch.md \
+  --persona-patch /tmp/persona_patch.md \
+  --base-dir ./colleagues
+```
+
+---
+
+### `version_manager.py`
+
+Manages version archives for a single colleague skill.
+
+**List available versions:**
+
+```bash
+python3 tools/version_manager.py \
+  --action list \
+  --slug qing-yun \
+  --base-dir ./colleagues
+```
+
+Output:
+
+```
+qing-yun version history:
+
+  v1  Archived: 2026-03-10 09:00  Files: SKILL.md, work.md, persona.md
+  v2  Archived: 2026-03-25 14:30  Files: SKILL.md, work.md, persona.md
+```
+
+**Clean up old versions** (keeps the 10 most recent by default):
+
+```bash
+python3 tools/version_manager.py \
+  --action cleanup \
+  --slug qing-yun \
+  --base-dir ./colleagues
+```
+
+<Note>
+  There is no separate `backup` action. Versioning happens automatically inside `rollback` — before restoring a target version, the current state is snapshotted as `{version}_before_rollback`.
+</Note>
+
+**Roll back to a specific version:**
+
+```bash
+python3 tools/version_manager.py \
+  --action rollback \
+  --slug qing-yun \
+  --version v2 \
+  --base-dir ./colleagues
+```
+
+---
+
+## Using a global base directory
+
+By default all tools read and write relative to `./colleagues/`. To use a global path shared across projects, pass `--base-dir`:
+
+```bash
+python3 tools/skill_writer.py --action list \
+  --base-dir ~/.openclaw/workspace/skills/colleagues
+```
+
+```bash
+python3 tools/version_manager.py --action rollback \
+  --slug qing-yun \
+  --version v2 \
+  --base-dir ~/.openclaw/workspace/skills/colleagues
+```

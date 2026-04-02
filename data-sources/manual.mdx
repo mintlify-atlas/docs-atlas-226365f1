@@ -1,0 +1,184 @@
+---
+title: 'Manual upload'
+description: 'Upload PDF, images, email files, Markdown, WeChat exports, or paste text directly to provide source material.'
+---
+
+Manual upload works for any platform and any file format. Use it when auto-collection is unavailable, when you have existing exports, or to supplement auto-collected data with additional files.
+
+<Tabs>
+  <Tab title="PDF and images">
+    ## PDF and image files
+
+    Claude Code supports PDF and image files natively using the `Read` tool. No conversion or preprocessing is needed.
+
+    Simply provide the file path in Claude Code when prompted for source material:
+
+    ```
+    # In Claude Code, when asked for source material:
+    Read /path/to/design-doc.pdf
+    Read /path/to/chat-screenshot.png
+    ```
+
+    **What works well:**
+    - PDF documents (design docs, RFCs, reports)
+    - Screenshots of chat conversations
+    - Screenshots of whiteboard sessions or diagrams with text
+    - Scanned documents
+
+    **Tips:**
+    - Higher resolution screenshots produce better text extraction
+    - For long chat screenshots, upload individual images rather than one very long scroll
+    - Redact sensitive personal information before uploading if needed
+  </Tab>
+  <Tab title="Feishu JSON export">
+    ## Feishu JSON export
+
+    If you have exported Feishu message history as a JSON file, parse it with `feishu_parser.py`:
+
+    ```bash
+    python3 tools/feishu_parser.py \
+      --file /path/to/feishu_export.json \
+      --target "Jane Smith" \
+      --output /tmp/feishu_out.txt
+    ```
+
+    Then read the output file in Claude Code:
+
+    ```
+    Read /tmp/feishu_out.txt
+    ```
+
+    The parser filters messages to only those sent by the target person, and classifies them by length and type for easier analysis.
+
+    **Supported export formats:**
+    - Feishu group chat JSON exports
+    - Feishu document exports
+
+    <Note>
+      If you have a Feishu App with API access, the [auto-collector](/data-sources/feishu) is recommended over manual export — it pulls more data with less effort.
+    </Note>
+  </Tab>
+  <Tab title="Email (.eml / .mbox)">
+    ## Email files
+
+    Parse `.eml` and `.mbox` email files with `email_parser.py`. The parser extracts emails sent by the target person, strips quoted reply threads, and classifies emails by type.
+
+    ### Parse a single `.eml` file
+
+    ```bash
+    python3 tools/email_parser.py \
+      --file /path/to/message.eml \
+      --target "jane@company.com" \
+      --output /tmp/email_out.txt
+    ```
+
+    ### Parse an `.mbox` archive (multiple emails)
+
+    ```bash
+    python3 tools/email_parser.py \
+      --file /path/to/inbox.mbox \
+      --target "Jane Smith" \
+      --output /tmp/email_out.txt
+    ```
+
+    The `--target` flag accepts either an email address or a name. The parser matches against the `From:` field of each message.
+
+    ### All CLI flags
+
+    | Flag | Required | Description |
+    |------|----------|-------------|
+    | `--file` | Yes | Input file path (`.eml`, `.mbox`, or `.txt`) |
+    | `--target` | Yes | Target person's email address or name |
+    | `--output` | No | Output file path (default: print to stdout) |
+
+    ### Output structure
+
+    The output file is organized into three sections:
+
+    1. **Long emails (>200 chars)** — technical proposals, opinions, long-form writing. Highest weight for Skill generation.
+    2. **Decision emails** — messages containing keywords like "approve", "reject", "recommend", "I think", etc.
+    3. **Daily communication** — shorter emails useful for capturing communication style.
+
+    ### Supported formats
+
+    | Format | Description |
+    |--------|-------------|
+    | `.eml` | Standard RFC 2822 email file (single message) |
+    | `.mbox` | Unix mailbox format (multiple messages) |
+    | `.txt` | Plain-text email records with `From:` / `Subject:` / `Date:` headers |
+
+    <Tip>
+      Email is especially valuable for capturing long-form technical writing. A single well-written design review email can reveal more about someone's thinking style than hundreds of short chat messages.
+    </Tip>
+  </Tab>
+  <Tab title="Markdown / TXT">
+    ## Markdown and plain text files
+
+    Markdown and `.txt` files are read directly using the `Read` tool in Claude Code — no preprocessing required.
+
+    ```
+    # In Claude Code, when asked for source material:
+    Read /path/to/design-notes.md
+    Read /path/to/meeting-notes.txt
+    ```
+
+    **Good candidates:**
+    - Personal wikis or notes exported from Notion, Obsidian, etc.
+    - README files and technical documentation written by the person
+    - Meeting notes
+    - Code review comment exports
+
+    You can provide multiple files one at a time, or paste their contents directly.
+  </Tab>
+  <Tab title="Paste text">
+    ## Direct text paste
+
+    You can paste any text content directly into Claude Code when prompted for source material. No files or tools needed.
+
+    This works for:
+    - Copied chat messages
+    - Excerpts from documents
+    - Notes you have written about the person
+    - Any other text you want to include
+
+    Even a short description of the person's personality and working style is enough to generate a basic Skill. All other fields and source material are optional.
+
+    **Example:**
+    ```
+    When asked for source material, paste:
+
+    "Jane is a backend engineer at ByteDance L2-1.
+     She writes very terse code review comments — usually just
+     'N+1 here' or 'use the standard response format'.
+     She never explains her decisions but is almost always right.
+     INTJ. Very deadline-driven."
+    ```
+  </Tab>
+  <Tab title="WeChat">
+    ## WeChat chat history
+
+    WeChat auto-decryption is currently unstable across different versions and platforms. The recommended approach is to use a third-party open-source tool to export your chat history first, then import the result into colleague.skill.
+
+    <Warning>
+      WeChat database encryption changes frequently and varies by version. Direct auto-decryption may fail silently or produce corrupt output. Use a dedicated export tool for reliable results.
+    </Warning>
+
+    ### Recommended export tools
+
+    | Tool | Platform | Description |
+    |------|----------|-------------|
+    | [WeChatMsg](https://github.com/LC044/WeChatMsg) | Windows | Export chat history in multiple formats |
+    | [PyWxDump](https://github.com/xaoyaoo/PyWxDump) | Windows | Decrypt and export WeChat database |
+    | [Liuhen (留痕)](https://github.com/greyovo/留痕) | macOS | Export WeChat chat history (recommended for Mac) |
+
+    These are independent open-source projects. colleague.skill parsers are compatible with their export formats.
+
+    ### After exporting
+
+    Once you have exported the chat history:
+
+    1. If exported as plain text or Markdown, use the `Read` tool directly in Claude Code.
+    2. If exported as a structured format, paste the relevant portions directly.
+    3. If you have screenshots, use the image upload method (see the PDF and images tab).
+  </Tab>
+</Tabs>

@@ -1,0 +1,149 @@
+---
+title: 'DingTalk'
+description: 'Auto-collect DingTalk documents, knowledge base content, spreadsheets, and messages via browser scraping.'
+---
+
+The DingTalk auto-collector pulls documents, knowledge base articles, and spreadsheets via API. Because the DingTalk Open API does not support retrieving historical message records, messages are collected through browser scraping using Playwright.
+
+## Prerequisites
+
+- Python 3.9+
+- `pip3 install requests playwright`
+- `playwright install chromium`
+- A DingTalk internal enterprise app with the permissions listed below
+
+## First-time setup
+
+Run the setup wizard to configure your AppKey and AppSecret:
+
+```bash
+python3 tools/dingtalk_auto_collector.py --setup
+```
+
+You will be prompted to visit [open-dev.dingtalk.com](https://open-dev.dingtalk.com) to create an internal app and enable the following permissions:
+
+**Contact permissions:**
+- `qyapi_get_member_detail` — query user details
+- `Contact.User.mobile` — read user phone number (optional)
+
+**Document permissions:**
+- `Doc.WorkSpace.READ` — read workspaces
+- `Doc.File.READ` — read files
+
+**Spreadsheet permissions:**
+- `Bitable.Record.READ` — read records
+
+<Note>
+  Message history (API) is not available in the DingTalk Open API. The collector automatically switches to browser scraping for messages.
+</Note>
+
+Config is saved to `~/.colleague-skill/dingtalk_config.json`.
+
+---
+
+## Running the collector
+
+### Basic usage
+
+```bash
+python3 tools/dingtalk_auto_collector.py \
+  --name "Jane Smith" \
+  --output-dir ./knowledge/jane \
+  --msg-limit 500 \
+  --doc-limit 20
+```
+
+### First run: completing browser login
+
+On first run, the browser scraper launches in headless mode. If you are not already logged into DingTalk web, it will detect this and prompt you. Use `--show-browser` to make the browser window visible so you can log in:
+
+```bash
+python3 tools/dingtalk_auto_collector.py \
+  --name "Jane Smith" \
+  --output-dir ./knowledge/jane \
+  --msg-limit 500 \
+  --doc-limit 20 \
+  --show-browser
+```
+
+After logging in, the session is reused automatically in subsequent runs.
+
+### Skip message collection
+
+If you only need documents and spreadsheets, skip the browser scraping step:
+
+```bash
+python3 tools/dingtalk_auto_collector.py \
+  --name "Jane Smith" \
+  --skip-messages
+```
+
+---
+
+## What gets collected
+
+| Content type | Collection method | Output file |
+|-------------|-------------------|-------------|
+| DingTalk documents | DingTalk API | `docs.txt` |
+| Knowledge base articles | DingTalk API | `docs.txt` |
+| Spreadsheets (multi-dimensional tables) | DingTalk API | `bitables.txt` |
+| Chat messages | Browser scraping (Playwright) | `messages.txt` |
+
+The collector searches for documents created or edited by the target user. It first tries a global search, then falls back to traversing workspaces if no results are found.
+
+---
+
+## Output files
+
+After collection, all files are written to the output directory:
+
+```
+knowledge/jane/
+├── docs.txt                 # Documents and knowledge base content
+├── bitables.txt             # Spreadsheet content (as Markdown tables)
+├── messages.txt             # Message records (browser-scraped)
+└── collection_summary.json  # Metadata: user ID, department, timestamp, file list
+```
+
+The `messages.txt` file is annotated with a note that the content was browser-scraped, since DingTalk does not provide a message history API.
+
+---
+
+## All CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | — | Colleague name to search for (required) |
+| `--output-dir` | `./knowledge/{name}` | Directory to write output files |
+| `--msg-limit` | `500` | Maximum messages to collect via browser |
+| `--doc-limit` | `20` | Maximum documents to collect |
+| `--skip-messages` | — | Skip browser-based message collection entirely |
+| `--chrome-profile` | auto-detected | Chrome profile directory path |
+| `--show-browser` | — | Show the browser window (required for first-time login) |
+| `--setup` | — | Run the interactive setup wizard |
+
+---
+
+## Why messages require browser scraping
+
+The DingTalk Open API (`api.dingtalk.com`) provides endpoints for contacts, documents, and spreadsheets, but does not expose any interface for reading historical chat messages. This is a deliberate API limitation by DingTalk.
+
+The collector works around this by opening the DingTalk web client (`im.dingtalk.com`) in a Playwright browser, navigating to the conversation, scrolling up to load history, and extracting message text from the DOM.
+
+<Warning>
+  Browser scraping depends on DingTalk's web client DOM structure, which can change with product updates. If message extraction fails, the output file will contain a note explaining the failure and suggesting you upload screenshots instead.
+</Warning>
+
+## Fallback: screenshot uploads
+
+If browser-based message collection fails, take screenshots of the chat window and upload them directly in Claude Code. The `Read` tool supports images natively and can extract text from screenshots.
+
+```bash
+# Example: after collecting with --skip-messages, 
+# upload screenshots manually in Claude Code using the Read tool
+```
+
+This is especially useful when:
+- The DingTalk web client has updated its DOM structure
+- You cannot authenticate in the browser
+- You only have a small number of messages to capture

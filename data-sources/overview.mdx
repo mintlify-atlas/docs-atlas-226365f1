@@ -1,0 +1,63 @@
+---
+title: 'Data sources overview'
+description: 'All supported data sources for colleague.skill — auto-collection and manual upload options, with quality guidance.'
+---
+
+colleague.skill can ingest data from a variety of sources. The more raw material you provide — especially long-form writing by the person — the more accurate the generated Skill will be.
+
+## Supported sources
+
+| Source | Messages | Docs / Wiki | Spreadsheets | Collection method |
+|--------|:--------:|:-----------:|:------------:|-------------------|
+| Feishu | ✅ API | ✅ | ✅ | Auto (recommended) |
+| DingTalk | ⚠️ Browser | ✅ | ✅ | Auto |
+| Slack | ✅ API | — | — | Auto |
+| WeChat chat history | ✅ SQLite | — | — | Manual (3rd-party export) |
+| PDF | — | ✅ | — | Manual upload |
+| Images / Screenshots | ✅ | — | — | Manual upload |
+| Feishu JSON export | ✅ | ✅ | — | Manual upload |
+| Email `.eml` / `.mbox` | ✅ | — | — | Manual upload |
+| Markdown / TXT | ✅ | ✅ | — | Manual upload |
+| Paste text directly | ✅ | — | — | Manual input |
+
+<Note>
+  DingTalk's Open API does not provide access to message history. The collector automatically falls back to browser scraping for messages.
+</Note>
+
+## Auto-collection vs manual upload
+
+**Auto-collection** (Feishu, DingTalk, Slack) connects to platform APIs or uses a browser session to pull data without you having to export anything. It is the fastest path to a rich dataset and is recommended when available.
+
+**Manual upload** covers everything else: exported files, screenshots, copy-pasted text. It is more flexible and works for any platform, but requires you to gather the files yourself.
+
+You can mix and match — for example, auto-collect Feishu messages and then also upload a few PDF documents.
+
+## Quality guidance
+
+Source material quality directly determines Skill quality. Prioritize in this order:
+
+1. **Long-form writing by the person** — design docs, technical proposals, long Slack threads. These reveal thinking style, technical standards, and decision patterns.
+2. **Decision-making replies** — responses where they approved, rejected, or directed something. These reveal values and behavioral patterns.
+3. **Casual messages** — shorter messages are useful for capturing communication style and vocabulary.
+4. **Manual description only** — even with no files, a good description can produce a usable Skill.
+
+<Tip>
+  Feishu auto-collection (API) produces the best results because it can pull both messages and documents in a single step, with accurate sender attribution.
+</Tip>
+
+## Source guides
+
+<CardGroup cols={2}>
+  <Card title="Feishu" icon="message-circle" href="/data-sources/feishu">
+    Auto-collect messages, docs, and spreadsheets via API. Covers group chats, private chats, browser method, and MCP method.
+  </Card>
+  <Card title="DingTalk" icon="building-2" href="/data-sources/dingtalk">
+    Auto-collect docs and knowledge base via API. Messages collected via browser scraping.
+  </Card>
+  <Card title="Slack" icon="slack" href="/data-sources/slack">
+    Auto-collect messages from channels and DMs using a Bot Token. Requires workspace admin to install the bot.
+  </Card>
+  <Card title="Manual upload" icon="upload" href="/data-sources/manual">
+    PDF, images, email files, Markdown, WeChat exports, and direct text paste.
+  </Card>
+</CardGroup>

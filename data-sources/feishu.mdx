@@ -1,0 +1,326 @@
+---
+title: 'Feishu'
+description: 'Auto-collect messages, documents, and spreadsheets from Feishu using the API, browser session, or MCP.'
+---
+
+Feishu is the recommended data source for colleague.skill. The auto-collector pulls group chat messages, private chat conversations, documents, Wikis, and spreadsheets in a single command.
+
+## Choosing a method
+
+| Scenario | Recommended method |
+|----------|--------------------|
+| You have a Feishu App with API access | `feishu_auto_collector.py` |
+| Internal docs (no App permission) | `feishu_browser.py` |
+| Specific doc/Wiki links via App Token | `feishu_mcp_client.py` |
+| Manual JSON export from Feishu | `feishu_parser.py` |
+
+---
+
+## Auto-collector (`feishu_auto_collector.py`)
+
+This is the recommended path. It collects group chat messages, private chat messages, documents, and spreadsheets automatically.
+
+### First-time setup
+
+Run the setup wizard once to configure your App ID and App Secret:
+
+```bash
+python3 tools/feishu_auto_collector.py --setup
+```
+
+You will be prompted to visit [open.feishu.cn](https://open.feishu.cn) to create an internal enterprise app and grant the following permissions:
+
+**Message permissions (app identity — for group chat collection):**
+- `im:message:readonly` — read messages
+- `im:chat:readonly` — read group chat info
+- `im:chat.members:readonly` — read group members
+
+**Message permissions (user identity — for private chat collection):**
+- `im:message` — read/send messages as user
+- `im:chat` — read chat list as user
+
+**User permissions:**
+- `contact:user.base:readonly` — read basic user info
+- `contact:department.base:readonly` — traverse departments to find users by name
+
+**Document permissions:**
+- `docs:doc:readonly` — read documents
+- `wiki:wiki:readonly` — read knowledge bases
+- `drive:drive:readonly` — search Drive files
+
+**Spreadsheet permissions:**
+- `bitable:app:readonly` — read spreadsheets
+
+Config is saved to `~/.colleague-skill/feishu_config.json`.
+
+### Group chat collection
+
+Group chat messages are collected using `tenant_access_token`. The bot must be added to the relevant group chats before running.
+
+```bash
+python3 tools/feishu_auto_collector.py \
+  --name "Jane Smith" \
+  --output-dir ./knowledge/jane \
+  --msg-limit 1000 \
+  --doc-limit 20
+```
+
+Output files:
+```
+knowledge/jane/
+├── messages.txt            # Group chat messages (filtered to target user)
+├── docs.txt                # Documents and Wiki content
+└── collection_summary.json # Summary: user info, collected file list, timestamp
+```
+
+### All CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | — | Colleague name to search for (required unless `--open-id` is given) |
+| `--output-dir` | `./knowledge/{name}` | Directory to write output files |
+| `--msg-limit` | `1000` | Maximum number of messages to collect |
+| `--doc-limit` | `20` | Maximum number of documents to collect |
+| `--open-id` | — | Skip user search and use this open_id directly |
+| `--p2p-chat-id` | — | Private chat session ID (overrides config file) |
+| `--user-token` | — | user_access_token for private chat (overrides config file) |
+| `--exchange-code` | — | Exchange an OAuth authorization code for a user_access_token |
+| `--setup` | — | Run the interactive setup wizard |
+
+---
+
+## Private chat collection
+
+Private chat messages require a `user_access_token`. The app's own identity (`tenant_access_token`) cannot access private chats — this is a Feishu API limitation.
+
+<Steps>
+  <Step title="Enable user scopes in your Feishu app">
+    In the Feishu Open Platform, go to your app → **Permission management** and enable these user-identity scopes:
+    - `im:message` — read/send messages as user
+    - `im:chat` — read chat list as user
+  </Step>
+  <Step title="Add the redirect URL">
+    In your app's **Security settings → Redirect URLs**, add:
+    ```
+    http://www.example.com
+    ```
+  </Step>
+  <Step title="Generate the OAuth authorization URL">
+    Replace `{APP_ID}` with your actual App ID:
+    ```
+    https://open.feishu.cn/open-apis/authen/v1/authorize?app_id={APP_ID}&redirect_uri=http://www.example.com&scope=im:message%20im:chat
+    ```
+    Open this URL in a browser. Log in and authorize the app.
+  </Step>
+  <Step title="Copy the authorization code">
+    After authorization, the browser redirects to:
+    ```
+    http://www.example.com?code=abc123...
+    ```
+    Copy the `code` value from the URL.
+  </Step>
+  <Step title="Exchange the code for a user_access_token">
+    ```bash
+    python3 tools/feishu_auto_collector.py --exchange-code abc123...
+    ```
+    The token is saved automatically to `~/.colleague-skill/feishu_config.json`. It expires after **2 hours**; use the `refresh_token` from the same config to renew it.
+
+    Alternatively, call the Feishu API directly:
+    ```python
+    # Step 1: get app_access_token
+    # POST https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal
+    # Body: {"app_id": "cli_xxx", "app_secret": "xxx"}
+
+    # Step 2: exchange code for user_access_token
+    # POST https://open.feishu.cn/open-apis/authen/v1/oidc/access_token
+    # Header: Authorization: Bearer {app_access_token}
+    # Body: {"grant_type": "authorization_code", "code": "abc123..."}
+    ```
+  </Step>
+  <Step title="Find the private chat ID (chat_id)">
+    Users typically don't know their private chat ID. The most reliable method is to send a message to the target user's `open_id` — the API response includes the `chat_id`:
+
+    ```python
+    # POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id
+    # Header: Authorization: Bearer {user_access_token}
+    # Body: {
+    #   "receive_id": "{target_open_id}",
+    #   "msg_type": "text",
+    #   "content": "{\"text\": \"hello\"}"
+    # }
+    # The chat_id in the response is the private chat session ID
+    ```
+
+    <Warning>
+      `GET /im/v1/chats` does **not** return private (P2P) chats. This is a Feishu API limitation, not a permission issue.
+    </Warning>
+
+    If you don't know the target user's `open_id`, search contacts using `tenant_access_token`:
+    ```python
+    # GET https://open.feishu.cn/open-apis/contact/v3/scopes
+    # Returns open_ids of all users visible to the app
+    ```
+  </Step>
+  <Step title="Run the private chat collection">
+    ```bash
+    python3 tools/feishu_auto_collector.py \
+      --open-id ou_xxxxxxxxxx \
+      --p2p-chat-id oc_xxxxxxxxxx \
+      --user-token u-xxxxxxxxxx \
+      --name "Jane Smith" \
+      --output-dir ./knowledge/jane \
+      --msg-limit 1000
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Browser method (`feishu_browser.py`)
+
+Reuses your local Chrome login session. No token configuration required. Works for internal documents and any content your own Feishu account can access.
+
+### Install dependencies
+
+```bash
+pip3 install playwright
+playwright install chromium
+```
+
+### Read a document or Wiki
+
+```bash
+python3 tools/feishu_browser.py \
+  --url "https://xxx.feishu.cn/wiki/xxxxxxxxxx" \
+  --output /tmp/feishu_doc_out.txt
+```
+
+On first use, if Chrome is not logged into Feishu, a browser window will open for you to log in. After login, the session is reused automatically.
+
+### Read a spreadsheet (exports as CSV)
+
+```bash
+python3 tools/feishu_browser.py \
+  --url "https://xxx.feishu.cn/sheets/xxxxxxxxxx" \
+  --output /tmp/feishu_sheet_out.csv
+```
+
+### Collect messages from a group chat
+
+```bash
+python3 tools/feishu_browser.py \
+  --chat "Backend team" \
+  --target "Jane Smith" \
+  --limit 500 \
+  --output /tmp/feishu_msg_out.txt
+```
+
+### All CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url` | — | Feishu document, Wiki, or spreadsheet URL |
+| `--chat` | — | Group chat name (for message collection) |
+| `--target` | — | Filter messages to only this person's name |
+| `--limit` | `500` | Maximum messages to collect |
+| `--output` | stdout | Output file path |
+| `--chrome-profile` | auto-detected | Chrome profile directory path |
+| `--show-browser` | — | Show the browser window (useful for first-time login) |
+| `--headless` | — | Force headless mode (no browser window) |
+
+<Warning>
+  If you see a login page in headless mode, run with `--show-browser` to complete the one-time login, then subsequent runs can be headless.
+</Warning>
+
+---
+
+## MCP method (`feishu_mcp_client.py`)
+
+Uses the `feishu-mcp` npm package to call the Feishu API via App Token. More stable than the browser method and works without a local Chrome install.
+
+### Install dependencies
+
+```bash
+npm install -g feishu-mcp   # requires Node.js 16+
+```
+
+The following app permissions are required:
+- `docs:doc:readonly` — read documents
+- `wiki:wiki:readonly` — read knowledge bases
+- `im:message:readonly` — read messages
+- `bitable:app:readonly` — read spreadsheets
+- `sheets:spreadsheet:readonly` — read sheets
+
+### First-time setup
+
+```bash
+python3 tools/feishu_mcp_client.py --setup
+```
+
+You will be prompted for your App ID and App Secret, and can choose between App Token mode (recommended) or User Token mode.
+
+### Read a document or Wiki
+
+```bash
+python3 tools/feishu_mcp_client.py \
+  --url "https://xxx.feishu.cn/wiki/xxxxxxxxxx" \
+  --output /tmp/feishu_doc_out.txt
+```
+
+### Read messages from a group chat
+
+```bash
+python3 tools/feishu_mcp_client.py \
+  --chat-id "oc_xxxxxxxxxx" \
+  --target "Jane Smith" \
+  --limit 500 \
+  --output /tmp/feishu_msg_out.txt
+```
+
+### List documents in a Wiki space
+
+```bash
+python3 tools/feishu_mcp_client.py \
+  --list-wiki \
+  --space-id "xxxxxxxxxx"
+```
+
+### All CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url` | — | Feishu document, Wiki, or spreadsheet URL |
+| `--chat-id` | — | Group chat ID in `oc_xxx` format |
+| `--target` | — | Filter messages to only this person's name |
+| `--limit` | `500` | Maximum messages to fetch |
+| `--list-wiki` | — | List all documents in a Wiki space |
+| `--space-id` | — | Wiki space ID (required with `--list-wiki`) |
+| `--output` | stdout | Output file path |
+| `--setup` | — | Run the interactive setup wizard |
+
+---
+
+## Reading Feishu JSON exports
+
+If you have a Feishu message export file (JSON format), parse it with `feishu_parser.py`:
+
+```bash
+python3 tools/feishu_parser.py \
+  --file /path/to/export.json \
+  --target "Jane Smith" \
+  --output /tmp/feishu_out.txt
+```
+
+Then read the output file in Claude Code with the `Read` tool.
+
+---
+
+## Common errors
+
+| Error | Likely cause | Fix |
+|-------|-------------|-----|
+| Bot not in group chat | Group chat collection returns no messages | In Feishu, open the group and add your app bot as a member |
+| `user_access_token` expired | Private chat collection fails | user tokens expire after 2 hours. Run `--exchange-code` again or use the `refresh_token` |
+| Permission denied on docs | App lacks document scopes | Enable `docs:doc:readonly` and `wiki:wiki:readonly` in the Feishu Open Platform |
+| Cannot find user by name | `contact:department.base:readonly` not granted | Enable the scope, or search by email with `--name user@company.com` |
+| Chrome profile not found | Wrong OS or non-default Chrome install | Pass `--chrome-profile /path/to/your/profile` explicitly |

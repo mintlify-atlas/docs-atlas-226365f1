@@ -1,0 +1,356 @@
+---
+title: Troubleshooting
+description: Common errors and fixes for installation, Feishu collection, DingTalk collection, Slack collection, and Skill quality issues.
+---
+
+<AccordionGroup>
+
+<Accordion title="Installation issues">
+
+### Python version
+
+colleague.skill requires Python 3.9 or later. Check your version:
+
+```bash
+python3 --version
+```
+
+If you're on an older version, upgrade via your system package manager or [python.org](https://python.org).
+
+### playwright install failing
+
+playwright requires a one-time browser download after the Python package is installed:
+
+```bash
+pip3 install playwright
+playwright install chromium
+```
+
+You only need to install chromium — a full Chrome install is not required. If `playwright install chromium` fails due to network or permissions issues, try:
+
+```bash
+playwright install chromium --with-deps
+```
+
+On Linux, missing system libraries are a common cause. The `--with-deps` flag installs them automatically.
+
+### pypinyin not found
+
+`pypinyin` is used to generate a pinyin-based slug from a Chinese name. It is optional. If it's missing, the skill falls back to using the raw name as the slug.
+
+To install it:
+
+```bash
+pip3 install pypinyin
+```
+
+If you see an error like `ModuleNotFoundError: No module named 'pypinyin'` during slug generation but the skill still creates files, this is expected behavior — the fallback is working correctly.
+
+</Accordion>
+
+<Accordion title="Feishu collection issues">
+
+### Bot not added to group chat
+
+**Error:** Collection completes but returns 0 messages.
+
+**Cause:** The Feishu bot can only read messages from channels it has joined. `GET /im/v1/chats` only returns group chats the bot is a member of.
+
+**Fix:** Add the bot to each target group chat in Feishu, then re-run collection:
+
+```bash
+python3 tools/feishu_auto_collector.py \
+  --name "{name}" \
+  --output-dir ./knowledge/{slug} \
+  --msg-limit 1000
+```
+
+### user_access_token expired
+
+**Error:** `401 Unauthorized` or `access token expired` during private chat collection.
+
+**Cause:** `user_access_token` has a 2-hour TTL.
+
+**Fix:** Refresh using the `refresh_token` that was saved during initial token exchange, or re-authorize:
+
+```bash
+python3 tools/feishu_auto_collector.py --exchange-code {NEW_CODE}
+```
+
+To get a new code, re-open the OAuth URL in the browser:
+```
+https://open.feishu.cn/open-apis/authen/v1/authorize?app_id={APP_ID}&redirect_uri=http://www.example.com&scope=im:message%20im:chat
+```
+
+After authorization, copy the `code` from the redirect URL and run `--exchange-code`.
+
+### Insufficient permissions
+
+**Error:** `403` or `insufficient scope` errors.
+
+**Fix:**
+1. Go to the Feishu Open Platform → your app → **Permissions & Scopes**
+2. Enable the required scopes:
+   - `im:message` — read/send messages as user
+   - `im:chat` — read chat list as user
+3. Submit the app for review if required, or re-authorize
+
+For group chat collection, the app needs `tenant_access_token` scopes (usually enabled by default for self-built apps).
+
+### Private chat not found
+
+**Error:** `GET /im/v1/chats` returns no results for a private chat.
+
+**Cause:** This is a Feishu API limitation, not a permission issue. The `/im/v1/chats` endpoint only returns group chats (type = `group`). P2P (private) chats are not listed by this endpoint.
+
+**Fix:** To get a P2P `chat_id`, send a message to the target user's `open_id` — the response contains the `chat_id`:
+
+```python
+POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id
+Authorization: Bearer {user_access_token}
+Body: {"receive_id": "{target_open_id}", "msg_type": "text", "content": "{\"text\":\"hello\"}"}
+```
+
+Then use that `chat_id` with `--p2p-chat-id`:
+
+```bash
+python3 tools/feishu_auto_collector.py \
+  --open-id {target_open_id} \
+  --p2p-chat-id {chat_id} \
+  --user-token {user_access_token} \
+  --name "{name}" \
+  --output-dir ./knowledge/{slug}
+```
+
+</Accordion>
+
+<Accordion title="DingTalk collection issues">
+
+### Message history not available via API
+
+**Behavior:** Message collection step is skipped or returns nothing.
+
+**Cause:** The DingTalk API does not support historical message retrieval. This is an expected platform limitation, not a bug. The auto-collector automatically falls back to browser-based scraping for messages.
+
+**Workaround:** If browser scraping also fails, ask the colleague to export or screenshot their chat history, then upload the images manually.
+
+### Browser login not completing
+
+**Error:** Login popup appears but the session doesn't persist, or the browser closes before login completes.
+
+**Fix:** Use `--show-browser` on first run to keep the browser visible and complete the DingTalk login interactively:
+
+```bash
+python3 tools/dingtalk_auto_collector.py \
+  --name "{name}" \
+  --output-dir ./knowledge/{slug} \
+  --show-browser
+```
+
+After successful login, the session is saved and subsequent runs do not need `--show-browser`.
+
+### Messages fall back to screenshot upload
+
+**Behavior:** After browser scraping, the tool prompts you to upload chat screenshots instead.
+
+**Cause:** Browser-based scraping failed (login issue, page layout change, or DingTalk anti-scraping).
+
+**Fix:** Manually capture screenshots of the relevant chat history and upload them. The `Read` tool in Claude Code supports images natively — screenshots are passed directly to the persona analysis pipeline.
+
+</Accordion>
+
+<Accordion title="Slack collection issues">
+
+### missing_scope: channels:history
+
+**Error:**
+```
+SlackApiError: missing_scope: channels:history
+```
+
+**Fix:**
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → your app → **OAuth & Permissions** → **Bot Token Scopes**
+2. Add the missing scope (`channels:history` and/or `groups:history`)
+3. Click **Reinstall to Workspace** to apply the new scopes
+4. Copy the new Bot User OAuth Token and re-run setup:
+
+```bash
+python3 tools/slack_auto_collector.py --setup
+```
+
+Full list of required scopes:
+
+| Scope | Purpose |
+|---|---|
+| `users:read` | Search user list (required) |
+| `channels:read` | List public channels (required) |
+| `channels:history` | Read public channel messages (required) |
+| `groups:read` | List private channels (required) |
+| `groups:history` | Read private channel messages (required) |
+| `mpim:read` | List group DMs (optional) |
+| `mpim:history` | Read group DM messages (optional) |
+| `im:read` | List DMs (optional) |
+| `im:history` | Read DM messages (optional) |
+
+### invalid_auth
+
+**Error:**
+```
+SlackApiError: invalid_auth
+```
+
+**Cause:** The Bot Token is invalid or has been revoked.
+
+**Fix:** Re-run setup to enter a fresh token:
+
+```bash
+python3 tools/slack_auto_collector.py --setup
+```
+
+The token is stored at `~/.colleague-skill/slack_config.json`. After re-running `--setup`, the old token is replaced.
+
+### not_in_channel
+
+**Error:**
+```
+SlackApiError: not_in_channel
+```
+
+**Cause:** The bot is not a member of the channel it's trying to read.
+
+**Fix:** In Slack, go to the target channel and invite the bot:
+
+```
+/invite @your-bot-name
+```
+
+Then re-run collection. To find which channels the target user is active in, run collection once — the output `collection_summary.json` lists all channels the bot has access to, which you can compare against the target's activity.
+
+### User not found
+
+**Error:** Collection completes but reports 0 messages, or the user search returns no results.
+
+**Cause:** The display name or username doesn't match exactly.
+
+**Fix:** Try alternative identifiers:
+
+```bash
+# Try English username (e.g., john.doe)
+python3 tools/slack_auto_collector.py --name "john.doe"
+
+# Try Slack display name exactly as shown in the UI
+python3 tools/slack_auto_collector.py --name "John Doe"
+```
+
+### 90-day message limit on free workspaces
+
+**Behavior:** Collection succeeds but only returns recent messages.
+
+**Cause:** Free Slack workspaces only retain 90 days of message history. This is a Slack platform limitation.
+
+**Fix:** Either upgrade the workspace to a paid plan (Pro / Business+ / Enterprise), or supplement the Slack data with other sources — emails, Feishu/DingTalk exports, screenshots, or manually pasted content.
+
+<Note>
+Rate limiting (HTTP 429) is handled automatically by the collector. The script waits and retries with exponential backoff — no manual intervention needed.
+</Note>
+
+</Accordion>
+
+<Accordion title="Skill quality issues">
+
+### Skill doesn't sound like them
+
+**Symptom:** The generated persona feels generic or like a character type rather than a specific person.
+
+**Fix:** Add more source material, especially long-form writing. Short messages produce a generic communication style; longer messages, docs, and design notes expose the vocabulary, sentence patterns, and reasoning style that make a persona feel distinct.
+
+Use the append mode:
+- Provide additional files or paste text when Claude Code is active in the project
+- Say "I have new files to add" to trigger evolution mode
+- The merger logic only updates relevant sections without overwriting existing conclusions
+
+### Wrong technical standards
+
+**Symptom:** The Work Skill generates advice that contradicts what the person would actually do (e.g., wrong preferred patterns, wrong tech stack, wrong code review criteria).
+
+**Fix:** Use correction mode with specific examples:
+
+```
+He wouldn't do that — he never uses raw SQL, always uses the ORM.
+```
+
+```
+That's wrong. His code review standard is {code, message, data} response format. That's non-negotiable.
+```
+
+Corrections are written to the `## Correction Log` section of `work.md` and take effect immediately after `SKILL.md` is regenerated.
+
+### Persona is too generic
+
+**Symptom:** The persona sounds like a stock personality type (e.g., "direct communicator who values efficiency") rather than a specific individual.
+
+**Fix:** Add more specific personality tags during creation or correction. Instead of vague descriptions:
+
+```
+personality: strict about quality
+```
+
+Use specific tags that map to concrete behavioral rules:
+
+```
+INTJ, blame-shifter, ByteDance-style, strict in CR but never explains why
+```
+
+The tag `strict in CR but never explains why` is a custom impression that gets extracted directly as a behavioral rule and is not covered by any generic tag.
+
+</Accordion>
+
+<Accordion title="Version and file management">
+
+### How to find the slug of a generated Skill
+
+Run:
+
+```bash
+python3 tools/skill_writer.py --action list --base-dir ./colleagues
+```
+
+Or use the slash command in Claude Code:
+
+```
+/list-colleagues
+```
+
+This lists all generated colleague Skills with their slugs, names, and creation dates.
+
+### Rollback if a bad update was merged
+
+Every time a Skill is updated (new files appended or corrections applied), the previous version is automatically archived in `colleagues/{slug}/versions/`.
+
+To roll back to a previous version:
+
+```bash
+python3 tools/version_manager.py --action rollback --slug {slug} --version {version} --base-dir ./colleagues
+```
+
+Or use the slash command:
+
+```
+/colleague-rollback {slug} {version}
+```
+
+To see available versions, check the `colleagues/{slug}/versions/` directory.
+
+### Manual deletion
+
+To permanently delete a colleague Skill, use the slash command in Claude Code:
+
+```
+/delete-colleague {slug}
+```
+
+Claude Code will ask for confirmation before deleting. Deletion removes `colleagues/{slug}/` and all its contents including version history.
+
+</Accordion>
+
+</AccordionGroup>

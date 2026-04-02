@@ -1,0 +1,91 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "colleague.skill",
+  "projectDescription": "A Claude Code skill that distills a colleague's work style and personality into a reusable AI skill from chat logs, documents, and emails.",
+  "theme": "almond",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Data Sources",
+            "pages": [
+              "data-sources/overview",
+              "data-sources/feishu",
+              "data-sources/dingtalk",
+              "data-sources/slack",
+              "data-sources/manual"
+            ]
+          },
+          {
+            "group": "How It Works",
+            "pages": [
+              "concepts/skill-structure",
+              "concepts/persona-layers",
+              "concepts/evolution"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "commands/create-colleague",
+              "commands/manage-colleagues"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/best-practices",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Auto-collect colleague data from Feishu, DingTalk, and Slack",
+    "Generate Work Skill capturing technical standards, workflows, and experience",
+    "Generate 5-layer Persona capturing personality, communication style, and decision patterns",
+    "Support for manual input: PDFs, images, emails, Markdown, and pasted text",
+    "Continuous evolution: append new files, correct via conversation, with full version history",
+    "Supports Chinese tech company level systems (ByteDance, Alibaba, Tencent, etc.)",
+    "Compatible with Claude Code and OpenClaw"
+  ],
+  "publicApiSurface": [
+    "/create-colleague",
+    "/list-colleagues",
+    "/{slug}",
+    "/{slug}-work",
+    "/{slug}-persona",
+    "/colleague-rollback {slug} {version}",
+    "/delete-colleague {slug}",
+    "feishu_auto_collector.py --setup",
+    "feishu_auto_collector.py --name --output-dir --msg-limit --doc-limit",
+    "feishu_auto_collector.py --exchange-code",
+    "feishu_browser.py --url --target --output",
+    "feishu_mcp_client.py --setup",
+    "feishu_mcp_client.py --url --output",
+    "feishu_mcp_client.py --chat-id --target --limit --output",
+    "dingtalk_auto_collector.py --setup",
+    "dingtalk_auto_collector.py --name --output-dir --msg-limit --doc-limit --show-browser",
+    "slack_auto_collector.py --setup",
+    "slack_auto_collector.py --name --output-dir --msg-limit --channel-limit",
+    "email_parser.py --file --target --output",
+    "skill_writer.py --action list --base-dir",
+    "version_manager.py --action backup --slug --base-dir",
+    "version_manager.py --action rollback --slug --version --base-dir"
+  ]
+}
